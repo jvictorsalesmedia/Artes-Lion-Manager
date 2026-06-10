@@ -33,9 +33,9 @@ Existe apenas um acesso administrativo:
 - Pedidos com filtros, status de produção, status financeiro e histórico.
 - Cupom fiscal/recibo gerencial em PDF com dados da ARTES LION ESTAMPARIA LTDA.
 - Kanban de produção.
-- Artes e aprovações.
 - Estoque com alertas e ajuste de entrada/saída.
 - Financeiro, fluxo de caixa, relatórios e exportações Excel/PDF.
+- Lixeira com resgate de clientes, orçamentos, pedidos, fornecedores e lembretes removidos.
 - Botão “Pedido pronto” com confirmação, mensagem automática e abertura do WhatsApp.
 
 ## Acesso de qualquer lugar

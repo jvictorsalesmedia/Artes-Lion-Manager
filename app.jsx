@@ -20,6 +20,7 @@ const MENU = [
   { id: "fornecedores", label: "Fornecedores", icon: "truck" },
   { id: "relatorios", label: "Relatórios", icon: "bar-chart-3" },
   { id: "exportacoes", label: "Exportações", icon: "download" },
+  { id: "lixeira", label: "Lixeira", icon: "trash-2" },
   { id: "configuracoes", label: "Configurações", icon: "settings" },
 ];
 
@@ -1135,7 +1136,7 @@ function DashboardView({ clients, orders, quotes, artworks, stock, transactions,
   );
 }
 
-function RemindersView({ reminders, setReminders, showToast }) {
+function RemindersView({ reminders, setReminders, moveToTrash, showToast }) {
   const [form, setForm] = useState({
     title: "",
     date: new Date().toISOString().slice(0, 10),
@@ -1208,8 +1209,7 @@ function RemindersView({ reminders, setReminders, showToast }) {
 
   function deleteReminder(reminder) {
     if (!window.confirm("Excluir este lembrete?")) return;
-    setReminders((items) => items.filter((item) => item.id !== reminder.id));
-    showToast("Lembrete excluído.");
+    moveToTrash("reminders", reminder);
   }
 
   function speakToday() {
@@ -1327,7 +1327,7 @@ function RemindersView({ reminders, setReminders, showToast }) {
   );
 }
 
-function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, selectedClientId, openModal, exportExcel, exportPDF, openWhatsAppTemplate }) {
+function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, selectedClientId, openModal, exportExcel, exportPDF, openWhatsAppTemplate, moveToTrash }) {
   const selected = clients.find((client) => client.id === selectedClientId) || clients[0];
   const selectedOrders = orders.filter((order) => order.clientId === selected?.id);
   const selectedQuotes = quotes.filter((quote) => quote.clientId === selected?.id);
@@ -1365,6 +1365,7 @@ function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, s
                   <th>Pedidos</th>
                   <th>Última compra</th>
                   <th>Status</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -1377,6 +1378,18 @@ function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, s
                     <td>{client.orderCount}</td>
                     <td>{dateLabel(client.lastPurchase)}</td>
                     <td><StatusBadge>{client.status}</StatusBadge></td>
+                    <td>
+                      <IconButton
+                        label="Enviar cliente para lixeira"
+                        icon="trash-2"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (window.confirm(`Enviar ${client.name} para a lixeira? Pedidos, orçamentos e movimentações vinculadas também sairão dos cálculos.`)) {
+                            moveToTrash("clients", client);
+                          }
+                        }}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1447,7 +1460,7 @@ function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, s
   );
 }
 
-function QuotesView({ quotes, clients, setQuotes, createOrderFromQuote, openModal, exportExcel, exportQuotePDF, showToast }) {
+function QuotesView({ quotes, clients, setQuotes, createOrderFromQuote, openModal, exportExcel, exportQuotePDF, moveToTrash, showToast }) {
   function updateQuoteStatus(quote, status) {
     setQuotes((items) => items.map((item) => (item.id === quote.id ? { ...item, status } : item)));
     if (status === "Aprovado") {
@@ -1515,6 +1528,15 @@ function QuotesView({ quotes, clients, setQuotes, createOrderFromQuote, openModa
                         <IconButton label="Duplicar" icon="copy" onClick={() => duplicateQuote(quote)} />
                         <IconButton label="Converter em pedido" icon="arrow-right-left" onClick={() => createOrderFromQuote(quote)} />
                         <IconButton label="Exportar PDF" icon="file-text" onClick={() => exportQuotePDF(quote)} />
+                        <IconButton
+                          label="Enviar orçamento para lixeira"
+                          icon="trash-2"
+                          onClick={() => {
+                            if (window.confirm(`Enviar o orçamento ${quote.number} para a lixeira?`)) {
+                              moveToTrash("quotes", quote);
+                            }
+                          }}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -1539,6 +1561,7 @@ function OrdersView({
   exportFiscalCoupon,
   handleOrderReady,
   registerPayment,
+  moveToTrash,
   selectedOrderId,
   setSelectedOrderId,
 }) {
@@ -1651,6 +1674,16 @@ function OrdersView({
                           <IconButton label="Registrar pagamento" icon="banknote" onClick={(event) => { event.stopPropagation(); registerPayment(order); }} />
                           <IconButton label="Gerar PDF" icon="file-text" onClick={(event) => { event.stopPropagation(); exportOrderPDF(order); }} />
                           <IconButton label="Cupom fiscal" icon="receipt-text" onClick={(event) => { event.stopPropagation(); exportFiscalCoupon(order); }} />
+                          <IconButton
+                            label="Enviar pedido para lixeira"
+                            icon="trash-2"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (window.confirm(`Enviar o pedido ${order.number} para a lixeira? As movimentações financeiras dele sairão do caixa e relatórios.`)) {
+                                moveToTrash("orders", order);
+                              }
+                            }}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -1696,6 +1729,17 @@ function OrdersView({
               <Button variant="secondary" icon="banknote" onClick={() => registerPayment(selected)}>Registrar pagamento</Button>
               <Button variant="secondary" icon="file-text" onClick={() => exportOrderPDF(selected)}>PDF do pedido</Button>
               <Button variant="secondary" icon="receipt-text" onClick={() => exportFiscalCoupon(selected)}>Cupom fiscal</Button>
+              <Button
+                variant="secondary"
+                icon="trash-2"
+                onClick={() => {
+                  if (window.confirm(`Enviar o pedido ${selected.number} para a lixeira? As movimentações financeiras dele sairão do caixa e relatórios.`)) {
+                    moveToTrash("orders", selected);
+                  }
+                }}
+              >
+                Enviar para lixeira
+              </Button>
             </div>
             <div className="mini-section">
               <h3>Arquivos anexados</h3>
@@ -2182,7 +2226,7 @@ function SupplierForm({ onSave, onCancel }) {
   );
 }
 
-function SuppliersView({ suppliers, setSuppliers, stock, setStock, transactions, setTransactions, showToast }) {
+function SuppliersView({ suppliers, setSuppliers, stock, setStock, transactions, setTransactions, moveToTrash, showToast }) {
   function registerPurchase(supplier) {
     const itemName = window.prompt("Material comprado:", stock[0]?.item || "");
     if (!itemName) return;
@@ -2214,8 +2258,7 @@ function SuppliersView({ suppliers, setSuppliers, stock, setStock, transactions,
 
   function deleteSupplier(supplier) {
     if (!window.confirm(`Excluir o fornecedor ${supplier.name}?`)) return;
-    setSuppliers((items) => items.filter((item) => item.id !== supplier.id));
-    showToast("Fornecedor excluído.");
+    moveToTrash("suppliers", supplier);
   }
 
   function openSupplierWhatsApp(supplier) {
@@ -2379,6 +2422,88 @@ function ExportsView({ clients, quotes, orders, stock, transactions, reminders, 
           </article>
         ))}
       </section>
+    </>
+  );
+}
+
+function TrashView({ trashItems, restoreTrashItem, deleteTrashItem }) {
+  const labels = {
+    clients: "Cliente",
+    quotes: "Orçamento",
+    orders: "Pedido",
+    suppliers: "Fornecedor",
+    reminders: "Lembrete",
+  };
+  const grouped = trashItems.reduce((acc, item) => {
+    const label = labels[item.collection] || item.typeLabel || item.collection;
+    acc[label] = (acc[label] || 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <>
+      <PageHeader
+        title="Lixeira"
+        subtitle="Itens removidos não entram no caixa, relatórios, gráficos ou exportações"
+      />
+
+      <section className="metric-grid compact-metrics">
+        <MetricCard icon="trash-2" label="Itens na lixeira" value={trashItems.length} helper="Removidos das telas principais" tone="warning" />
+        {Object.entries(grouped).slice(0, 3).map(([label, total]) => (
+          <MetricCard key={label} icon="archive-restore" label={label} value={total} helper="Disponível para resgate" />
+        ))}
+      </section>
+
+      <article className="panel">
+        <div className="panel-title">
+          <h2>Itens removidos</h2>
+          <span>{trashItems.length} registros</span>
+        </div>
+        {trashItems.length ? (
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Registro</th>
+                  <th>Removido em</th>
+                  <th>Dados vinculados</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {trashItems.map((item) => {
+                  const relatedCount = Object.values(item.related || {}).reduce((sum, list) => sum + (Array.isArray(list) ? list.length : 0), 0);
+                  return (
+                    <tr key={item.trashId}>
+                      <td><StatusBadge>{labels[item.collection] || item.typeLabel}</StatusBadge></td>
+                      <td>{item.title}</td>
+                      <td>{item.deletedAt}</td>
+                      <td>{relatedCount ? `${relatedCount} vínculo(s)` : "-"}</td>
+                      <td>
+                        <div className="row-actions">
+                          <Button variant="secondary" icon="archive-restore" onClick={() => restoreTrashItem(item)}>Resgatar</Button>
+                          <IconButton
+                            label="Excluir definitivamente"
+                            icon="x"
+                            onClick={() => {
+                              if (window.confirm("Excluir definitivamente este item da lixeira?")) {
+                                deleteTrashItem(item);
+                              }
+                            }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState title="Lixeira vazia" text="Quando você remover clientes, orçamentos, pedidos ou fornecedores, eles aparecerão aqui." />
+        )}
+      </article>
     </>
   );
 }
@@ -2672,6 +2797,7 @@ function App() {
   const [transactions, setTransactions] = useStoredState("alm_transactions", initialTransactions);
   const [suppliers, setSuppliers] = useStoredState("alm_suppliers", initialSuppliers);
   const [reminders, setReminders] = useStoredState("alm_reminders", initialReminders);
+  const [trashItems, setTrashItems] = useStoredState("alm_trash", []);
   const [modal, setModal] = useState(null);
   const [readyOrder, setReadyOrder] = useState(null);
   const [toast, setToast] = useState("");
@@ -2736,6 +2862,107 @@ function App() {
 
   function closeModal() {
     setModal(null);
+  }
+
+  function trashTitle(collection, item) {
+    if (collection === "clients") return item.name;
+    if (collection === "quotes") return item.number;
+    if (collection === "orders") return item.number;
+    if (collection === "suppliers") return item.name;
+    if (collection === "reminders") return item.title;
+    return item.name || item.title || item.number || "Registro";
+  }
+
+  function moveToTrash(collection, item) {
+    const related = {};
+    const trashRecord = {
+      trashId: `${collection}-${item.id}-${Date.now()}`,
+      collection,
+      title: trashTitle(collection, item),
+      data: item,
+      related,
+      deletedAt: dateTimeNowLabel(),
+    };
+
+    if (collection === "clients") {
+      const relatedOrders = orders.filter((order) => order.clientId === item.id);
+      const relatedQuotes = quotes.filter((quote) => quote.clientId === item.id);
+      const orderNumbers = new Set(relatedOrders.map((order) => order.number));
+      related.orders = relatedOrders;
+      related.quotes = relatedQuotes;
+      related.transactions = transactions.filter((transaction) => orderNumbers.has(transaction.orderNumber));
+      related.artworks = artworks.filter((art) => art.clientId === item.id || orderNumbers.has(art.orderNumber));
+
+      setClients((rows) => rows.filter((row) => row.id !== item.id));
+      setOrders((rows) => rows.filter((row) => row.clientId !== item.id));
+      setQuotes((rows) => rows.filter((row) => row.clientId !== item.id));
+      setTransactions((rows) => rows.filter((row) => !orderNumbers.has(row.orderNumber)));
+      setArtworks((rows) => rows.filter((row) => row.clientId !== item.id && !orderNumbers.has(row.orderNumber)));
+    }
+
+    if (collection === "orders") {
+      related.transactions = transactions.filter((transaction) => transaction.orderNumber === item.number);
+      related.artworks = artworks.filter((art) => art.orderNumber === item.number);
+      setOrders((rows) => rows.filter((row) => row.id !== item.id));
+      setTransactions((rows) => rows.filter((row) => row.orderNumber !== item.number));
+      setArtworks((rows) => rows.filter((row) => row.orderNumber !== item.number));
+    }
+
+    if (collection === "quotes") {
+      setQuotes((rows) => rows.filter((row) => row.id !== item.id));
+    }
+
+    if (collection === "suppliers") {
+      related.transactions = transactions.filter((transaction) => transaction.category === "Fornecedor" && transaction.description.includes(item.name));
+      setSuppliers((rows) => rows.filter((row) => row.id !== item.id));
+      setTransactions((rows) => rows.filter((row) => !(row.category === "Fornecedor" && row.description.includes(item.name))));
+    }
+
+    if (collection === "reminders") {
+      setReminders((rows) => rows.filter((row) => row.id !== item.id));
+    }
+
+    setTrashItems((rows) => [trashRecord, ...rows]);
+    showToast(`${trashRecord.title} enviado para a lixeira.`);
+  }
+
+  function restoreUnique(setter, restoredRows) {
+    if (!restoredRows?.length) return;
+    setter((rows) => {
+      const existing = new Set(rows.map((row) => row.id));
+      return [...restoredRows.filter((row) => !existing.has(row.id)), ...rows];
+    });
+  }
+
+  function restoreTrashItem(item) {
+    if (item.collection === "clients") {
+      restoreUnique(setClients, [item.data]);
+      restoreUnique(setOrders, item.related?.orders || []);
+      restoreUnique(setQuotes, item.related?.quotes || []);
+      restoreUnique(setTransactions, item.related?.transactions || []);
+      restoreUnique(setArtworks, item.related?.artworks || []);
+    }
+
+    if (item.collection === "orders") {
+      restoreUnique(setOrders, [item.data]);
+      restoreUnique(setTransactions, item.related?.transactions || []);
+      restoreUnique(setArtworks, item.related?.artworks || []);
+    }
+
+    if (item.collection === "quotes") restoreUnique(setQuotes, [item.data]);
+    if (item.collection === "suppliers") {
+      restoreUnique(setSuppliers, [item.data]);
+      restoreUnique(setTransactions, item.related?.transactions || []);
+    }
+    if (item.collection === "reminders") restoreUnique(setReminders, [item.data]);
+
+    setTrashItems((rows) => rows.filter((row) => row.trashId !== item.trashId));
+    showToast(`${item.title} resgatado da lixeira.`);
+  }
+
+  function deleteTrashItem(item) {
+    setTrashItems((rows) => rows.filter((row) => row.trashId !== item.trashId));
+    showToast(`${item.title} excluído definitivamente da lixeira.`);
   }
 
   function exportExcel(filename, rows) {
@@ -3109,7 +3336,7 @@ function App() {
             />
           )}
           {activeModule === "lembretes" && (
-            <RemindersView reminders={reminders} setReminders={setReminders} showToast={showToast} />
+            <RemindersView reminders={reminders} setReminders={setReminders} moveToTrash={moveToTrash} showToast={showToast} />
           )}
           {activeModule === "clientes" && (
             <ClientsView
@@ -3123,6 +3350,7 @@ function App() {
               exportExcel={exportExcel}
               exportPDF={exportPDF}
               openWhatsAppTemplate={openWhatsAppTemplate}
+              moveToTrash={moveToTrash}
             />
           )}
           {activeModule === "orcamentos" && (
@@ -3134,6 +3362,7 @@ function App() {
               openModal={openModal}
               exportExcel={exportExcel}
               exportQuotePDF={exportQuotePDF}
+              moveToTrash={moveToTrash}
               showToast={showToast}
             />
           )}
@@ -3149,6 +3378,7 @@ function App() {
               exportFiscalCoupon={exportFiscalCoupon}
               handleOrderReady={handleOrderReady}
               registerPayment={registerPayment}
+              moveToTrash={moveToTrash}
               selectedOrderId={selectedOrderId}
               setSelectedOrderId={setSelectedOrderId}
             />
@@ -3161,11 +3391,14 @@ function App() {
           {activeModule === "fluxo" && <CashFlowView transactions={transactions} orders={orders} />}
           {activeModule === "produtos" && <ProductsView orders={orders} />}
           {activeModule === "fornecedores" && (
-            <SuppliersView suppliers={suppliers} setSuppliers={setSuppliers} stock={stock} setStock={setStock} transactions={transactions} setTransactions={setTransactions} showToast={showToast} />
+            <SuppliersView suppliers={suppliers} setSuppliers={setSuppliers} stock={stock} setStock={setStock} transactions={transactions} setTransactions={setTransactions} moveToTrash={moveToTrash} showToast={showToast} />
           )}
           {activeModule === "relatorios" && <ReportsView clients={clients} orders={orders} stock={stock} transactions={transactions} exportPDF={exportPDF} />}
           {activeModule === "exportacoes" && (
             <ExportsView clients={clients} quotes={quotes} orders={orders} stock={stock} transactions={transactions} reminders={reminders} exportExcel={exportExcel} exportPDF={exportPDF} exportDashboardPDF={exportDashboardPDF} />
+          )}
+          {activeModule === "lixeira" && (
+            <TrashView trashItems={trashItems} restoreTrashItem={restoreTrashItem} deleteTrashItem={deleteTrashItem} />
           )}
           {activeModule === "configuracoes" && <SettingsView />}
         </div>
