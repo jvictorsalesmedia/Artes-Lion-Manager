@@ -1,6 +1,6 @@
 # Artes Lion Manager
 
-Sistema web responsivo para a Artes Lion Estamparia com dados simulados.
+Sistema web responsivo para a Artes Lion Estamparia, pronto para cadastro real de clientes, pedidos, financeiro, estoque e fornecedores.
 
 ## Como executar
 
@@ -16,12 +16,27 @@ Depois acesse:
 http://localhost:4173/
 ```
 
-## Login administrativo
+## Logins
 
-Existe apenas um acesso administrativo:
+Administrador principal:
 
 - Usuário: `arteslionadm`
 - Senha: `arteslionadm147`
+
+Usuário de teste:
+
+- Usuário: `teste`
+- Senha: `teste123`
+
+O usuário de teste pode ser excluído pelo administrador em `Configurações > Usuários do sistema`.
+
+## Manual do usuário
+
+O manual completo está em:
+
+```text
+MANUAL-DO-USUARIO.md
+```
 
 ## Incluído no MVP
 

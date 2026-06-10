@@ -567,6 +567,25 @@ const permissions = [
   { role: "Atendimento", access: "Clientes, orçamentos, pedidos e mensagens WhatsApp" },
 ];
 
+const initialUsers = [
+  {
+    id: "admin",
+    username: "arteslionadm",
+    password: "arteslionadm147",
+    role: "Administrador",
+    protected: true,
+    createdAt: "sistema",
+  },
+  {
+    id: "teste",
+    username: "teste",
+    password: "teste123",
+    role: "Teste",
+    protected: false,
+    createdAt: "usuário de teste",
+  },
+];
+
 function asDate(value) {
   return new Date(`${value}T12:00:00`);
 }
@@ -599,8 +618,27 @@ function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+const STORAGE_VERSION_KEY = "alm_storage_version";
+const STORAGE_VERSION = "prod-reset-2026-06-10-001";
+
+function ensureStorageVersion() {
+  try {
+    if (!window.localStorage) return;
+    if (window.localStorage.getItem(STORAGE_VERSION_KEY) === STORAGE_VERSION) return;
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith("alm_") && key !== STORAGE_VERSION_KEY) {
+        window.localStorage.removeItem(key);
+      }
+    }
+    window.localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION);
+  } catch (error) {
+    // Local storage may be blocked by browser settings.
+  }
+}
+
 function loadStored(key, fallback) {
   try {
+    ensureStorageVersion();
     const saved = window.localStorage.getItem(key);
     return saved ? JSON.parse(saved) : fallback;
   } catch (error) {
@@ -846,15 +884,16 @@ function Modal({ title, children, onClose, footer }) {
   );
 }
 
-function Login({ onLogin }) {
+function Login({ onLogin, users }) {
   const [username, setUsername] = useState("arteslionadm");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   function submit(event) {
     event.preventDefault();
-    if (username.trim() === "arteslionadm" && password === "arteslionadm147") {
-      onLogin({ email: "arteslionadm", role: "Administrador" });
+    const foundUser = users.find((user) => user.username === username.trim() && user.password === password);
+    if (foundUser) {
+      onLogin({ email: foundUser.username, role: foundUser.role, id: foundUser.id });
       return;
     }
     setError("Usuário ou senha inválidos.");
@@ -1334,6 +1373,13 @@ function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, s
   const selectedArt = artworks.filter((art) => art.clientId === selected?.id);
   const pending = selectedOrders.reduce((sum, order) => sum + remaining(order), 0);
 
+  function sendClientToTrash(client) {
+    if (!client) return;
+    if (window.confirm(`Enviar ${client.name} para a lixeira? Pedidos, orçamentos e movimentações vinculadas também sairão dos cálculos.`)) {
+      moveToTrash("clients", client);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -1342,6 +1388,7 @@ function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, s
         actions={
           <>
             <Button icon="user-plus" onClick={() => openModal("client")}>Cadastrar cliente</Button>
+            {selected ? <Button icon="trash-2" variant="ghost" onClick={() => sendClientToTrash(selected)}>Enviar cliente para lixeira</Button> : null}
             <Button icon="sheet" variant="secondary" onClick={() => exportExcel("clientes", clients)}>Excel</Button>
             <Button icon="file-text" variant="ghost" onClick={() => exportPDF("Clientes", clients, ["name", "phone", "type", "status"])}>PDF</Button>
           </>
@@ -1379,16 +1426,16 @@ function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, s
                     <td>{dateLabel(client.lastPurchase)}</td>
                     <td><StatusBadge>{client.status}</StatusBadge></td>
                     <td>
-                      <IconButton
-                        label="Enviar cliente para lixeira"
+                      <Button
+                        variant="ghost"
                         icon="trash-2"
                         onClick={(event) => {
                           event.stopPropagation();
-                          if (window.confirm(`Enviar ${client.name} para a lixeira? Pedidos, orçamentos e movimentações vinculadas também sairão dos cálculos.`)) {
-                            moveToTrash("clients", client);
-                          }
+                          sendClientToTrash(client);
                         }}
-                      />
+                      >
+                        Lixeira
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -1423,6 +1470,9 @@ function ClientsView({ clients, orders, quotes, artworks, setSelectedClientId, s
                   {template}
                 </Button>
               ))}
+              <Button variant="ghost" icon="trash-2" onClick={() => sendClientToTrash(selected)}>
+                Enviar cliente para lixeira
+              </Button>
             </div>
 
             <div className="mini-section">
@@ -1478,6 +1528,12 @@ function QuotesView({ quotes, clients, setQuotes, createOrderFromQuote, openModa
     showToast(`Orçamento ${nextNumber} duplicado.`);
   }
 
+  function sendQuoteToTrash(quote) {
+    if (window.confirm(`Enviar o orçamento ${quote.number} para a lixeira?`)) {
+      moveToTrash("quotes", quote);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -1528,15 +1584,9 @@ function QuotesView({ quotes, clients, setQuotes, createOrderFromQuote, openModa
                         <IconButton label="Duplicar" icon="copy" onClick={() => duplicateQuote(quote)} />
                         <IconButton label="Converter em pedido" icon="arrow-right-left" onClick={() => createOrderFromQuote(quote)} />
                         <IconButton label="Exportar PDF" icon="file-text" onClick={() => exportQuotePDF(quote)} />
-                        <IconButton
-                          label="Enviar orçamento para lixeira"
-                          icon="trash-2"
-                          onClick={() => {
-                            if (window.confirm(`Enviar o orçamento ${quote.number} para a lixeira?`)) {
-                              moveToTrash("quotes", quote);
-                            }
-                          }}
-                        />
+                        <Button variant="ghost" icon="trash-2" onClick={() => sendQuoteToTrash(quote)}>
+                          Lixeira
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -1597,6 +1647,13 @@ function OrdersView({
     );
   }
 
+  function sendOrderToTrash(order) {
+    if (!order) return;
+    if (window.confirm(`Enviar o pedido ${order.number} para a lixeira? As movimentações financeiras dele sairão do caixa e relatórios.`)) {
+      moveToTrash("orders", order);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -1605,6 +1662,7 @@ function OrdersView({
         actions={
           <>
             <Button icon="plus" onClick={() => openModal("order")}>Novo pedido</Button>
+            {selected ? <Button icon="trash-2" variant="ghost" onClick={() => sendOrderToTrash(selected)}>Enviar pedido para lixeira</Button> : null}
             <Button icon="sheet" variant="secondary" onClick={() => exportExcel("pedidos", orders)}>Excel</Button>
             <Button icon="file-text" variant="ghost" onClick={() => exportPDF("Pedidos", orders, ["number", "product", "productionStatus", "financialStatus"])}>PDF</Button>
           </>
@@ -1674,16 +1732,16 @@ function OrdersView({
                           <IconButton label="Registrar pagamento" icon="banknote" onClick={(event) => { event.stopPropagation(); registerPayment(order); }} />
                           <IconButton label="Gerar PDF" icon="file-text" onClick={(event) => { event.stopPropagation(); exportOrderPDF(order); }} />
                           <IconButton label="Cupom fiscal" icon="receipt-text" onClick={(event) => { event.stopPropagation(); exportFiscalCoupon(order); }} />
-                          <IconButton
-                            label="Enviar pedido para lixeira"
+                          <Button
+                            variant="ghost"
                             icon="trash-2"
                             onClick={(event) => {
                               event.stopPropagation();
-                              if (window.confirm(`Enviar o pedido ${order.number} para a lixeira? As movimentações financeiras dele sairão do caixa e relatórios.`)) {
-                                moveToTrash("orders", order);
-                              }
+                              sendOrderToTrash(order);
                             }}
-                          />
+                          >
+                            Lixeira
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -1732,11 +1790,7 @@ function OrdersView({
               <Button
                 variant="secondary"
                 icon="trash-2"
-                onClick={() => {
-                  if (window.confirm(`Enviar o pedido ${selected.number} para a lixeira? As movimentações financeiras dele sairão do caixa e relatórios.`)) {
-                    moveToTrash("orders", selected);
-                  }
-                }}
+                onClick={() => sendOrderToTrash(selected)}
               >
                 Enviar para lixeira
               </Button>
@@ -2508,7 +2562,8 @@ function TrashView({ trashItems, restoreTrashItem, deleteTrashItem }) {
   );
 }
 
-function SettingsView() {
+function SettingsView({ users, currentUser, deleteUser, recreateTestUser }) {
+  const isAdmin = currentUser?.role === "Administrador";
   const rules = [
     "Cliente não pode ser cadastrado sem telefone/WhatsApp.",
     "Pedido não pode ser criado sem cliente.",
@@ -2555,6 +2610,50 @@ function SettingsView() {
               </div>
             ))}
           </div>
+        </article>
+        <article className="panel">
+          <div className="panel-title">
+            <h2>Usuários do sistema</h2>
+            {isAdmin ? <Button variant="secondary" icon="user-plus" onClick={recreateTestUser}>Recriar teste</Button> : null}
+          </div>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Perfil</th>
+                  <th>Origem</th>
+                  <th>Status</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.username}</td>
+                    <td>{item.role}</td>
+                    <td>{item.createdAt}</td>
+                    <td><StatusBadge>{item.protected ? "protegido" : "removível"}</StatusBadge></td>
+                    <td>
+                      {item.protected ? (
+                        <span className="muted-text">Admin principal</span>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          icon="trash-2"
+                          disabled={!isAdmin || currentUser?.id === item.id}
+                          onClick={() => deleteUser(item)}
+                        >
+                          Excluir usuário
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="internal-note">Usuário de teste inicial: teste / teste123. Ele pode ser excluído pelo administrador nesta tabela.</p>
         </article>
         <article className="panel">
           <div className="panel-title">
@@ -2789,20 +2888,21 @@ function App() {
   const [user, setUser] = useState(null);
   const [activeModule, setActiveModule] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [clients, setClients] = useStoredState("alm_clients", initialClients);
-  const [orders, setOrders] = useStoredState("alm_orders", initialOrders);
-  const [quotes, setQuotes] = useStoredState("alm_quotes", initialQuotes);
-  const [artworks, setArtworks] = useStoredState("alm_artworks", initialArtworks);
-  const [stock, setStock] = useStoredState("alm_stock", initialStock);
-  const [transactions, setTransactions] = useStoredState("alm_transactions", initialTransactions);
-  const [suppliers, setSuppliers] = useStoredState("alm_suppliers", initialSuppliers);
-  const [reminders, setReminders] = useStoredState("alm_reminders", initialReminders);
-  const [trashItems, setTrashItems] = useStoredState("alm_trash", []);
+  const [clients, setClients] = useStoredState("alm_prod_clients", []);
+  const [orders, setOrders] = useStoredState("alm_prod_orders", []);
+  const [quotes, setQuotes] = useStoredState("alm_prod_quotes", []);
+  const [artworks, setArtworks] = useStoredState("alm_prod_artworks", []);
+  const [stock, setStock] = useStoredState("alm_prod_stock", []);
+  const [transactions, setTransactions] = useStoredState("alm_prod_transactions", []);
+  const [suppliers, setSuppliers] = useStoredState("alm_prod_suppliers", []);
+  const [reminders, setReminders] = useStoredState("alm_prod_reminders", []);
+  const [trashItems, setTrashItems] = useStoredState("alm_prod_trash", []);
+  const [users, setUsers] = useStoredState("alm_prod_users", initialUsers);
   const [modal, setModal] = useState(null);
   const [readyOrder, setReadyOrder] = useState(null);
   const [toast, setToast] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState(initialClients[0].id);
-  const [selectedOrderId, setSelectedOrderId] = useState(initialOrders[0].id);
+  const [selectedClientId, setSelectedClientId] = useState(null);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
   useEffect(() => {
     if (window.lucide) window.lucide.createIcons({ attrs: { "stroke-width": 1.8 } });
@@ -2850,6 +2950,28 @@ function App() {
 
   function showToast(message) {
     setToast(message);
+  }
+
+  function deleteUser(userItem) {
+    if (userItem.protected) {
+      showToast("O administrador principal não pode ser excluído.");
+      return;
+    }
+    if (user?.id === userItem.id) {
+      showToast("Você não pode excluir o usuário que está logado.");
+      return;
+    }
+    if (!window.confirm(`Excluir o usuário ${userItem.username}?`)) return;
+    setUsers((items) => items.filter((item) => item.id !== userItem.id));
+    showToast(`Usuário ${userItem.username} excluído.`);
+  }
+
+  function recreateTestUser() {
+    setUsers((items) => {
+      if (items.some((item) => item.id === "teste" || item.username === "teste")) return items;
+      return [...items, initialUsers.find((item) => item.id === "teste")];
+    });
+    showToast("Usuário de teste disponível: teste / teste123.");
   }
 
   function clientForId(id) {
@@ -3270,6 +3392,7 @@ function App() {
   if (!isAuthenticated) {
     return (
       <Login
+        users={users}
         onLogin={(payload) => {
           setUser(payload);
           setIsAuthenticated(true);
@@ -3400,7 +3523,9 @@ function App() {
           {activeModule === "lixeira" && (
             <TrashView trashItems={trashItems} restoreTrashItem={restoreTrashItem} deleteTrashItem={deleteTrashItem} />
           )}
-          {activeModule === "configuracoes" && <SettingsView />}
+          {activeModule === "configuracoes" && (
+            <SettingsView users={users} currentUser={user} deleteUser={deleteUser} recreateTestUser={recreateTestUser} />
+          )}
         </div>
       </main>
 
