@@ -44,12 +44,15 @@ MANUAL-DO-USUARIO.md
 - Lembretes manuais e por voz, com abertura automática do evento no Google Agenda.
 - Assistente de voz ao abrir o sistema e alerta diário às 17h enquanto o app estiver aberto.
 - Clientes com WhatsApp, perfil, histórico e mensagens prontas.
-- Orçamentos com duplicação, PDF e conversão em pedido.
+- Orçamentos com duplicação, PDF profissional de proposta comercial e conversão em pedido.
 - Pedidos com filtros, status de produção, status financeiro e histórico.
 - Cupom fiscal/recibo gerencial em PDF com dados da ARTES LION ESTAMPARIA LTDA.
 - Kanban de produção.
-- Estoque com alertas e ajuste de entrada/saída.
-- Financeiro, fluxo de caixa, relatórios e exportações Excel/PDF.
+- Estoque com cadastro manual, alertas, ajuste de entrada/saída e baixa automática ao criar pedido.
+- Financeiro e fluxo de caixa com lançamento de custos da empresa por categoria.
+- Gestão de funcionários com salários, diárias, faltas, atestados, vales, comprovantes e salário final do período.
+- Filtro global por semana, quinzena, mês, trimestre, semestre, ano ou período personalizado.
+- Relatórios e exportações Excel/PDF.
 - Lixeira com resgate de clientes, orçamentos, pedidos, fornecedores e lembretes removidos.
 - Botão “Pedido pronto” com confirmação, mensagem automática e abertura do WhatsApp.
 

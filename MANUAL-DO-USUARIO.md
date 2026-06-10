@@ -4,7 +4,7 @@
 
 O **Artes Lion Manager** é um sistema web criado para organizar a gestão da **Artes Lion Estamparia LTDA**.
 
-Ele centraliza clientes, orçamentos, pedidos, produção, estoque, financeiro, fluxo de caixa, fornecedores, lembretes, relatórios, exportações e lixeira em um único painel.
+Ele centraliza clientes, orçamentos, pedidos, produção, estoque, financeiro, fluxo de caixa, fornecedores, funcionários, lembretes, relatórios, exportações e lixeira em um único painel.
 
 O objetivo é ajudar o administrador a enxergar rapidamente:
 
@@ -16,6 +16,7 @@ O objetivo é ajudar o administrador a enxergar rapidamente:
 - quais produtos e serviços vendem mais;
 - quais materiais estão com estoque baixo;
 - qual é a situação real do caixa;
+- qual é o custo previsto da equipe;
 - quais tarefas e lembretes precisam de atenção.
 
 ## 2. Acesso Ao Sistema
@@ -63,12 +64,15 @@ O sistema possui menu lateral com as seguintes abas:
 9. Fluxo de Caixa
 10. Produtos e Serviços
 11. Fornecedores
-12. Relatórios
-13. Exportações
-14. Lixeira
-15. Configurações
+12. Funcionários
+13. Relatórios
+14. Exportações
+15. Lixeira
+16. Configurações
 
 No computador, o menu fica na lateral. Em telas menores, ele se adapta para navegação mobile.
+
+No topo do sistema existe um filtro de período. Ele permite visualizar os dados por semana, quinzena, mês, trimestre, semestre, ano ou período personalizado. As abas de Dashboard, orçamentos, pedidos, produção, financeiro, fluxo de caixa, produtos e serviços, funcionários, relatórios e exportações respeitam esse recorte.
 
 ## 5. Dashboard
 
@@ -85,7 +89,6 @@ Principais cards:
 - Pedidos atrasados;
 - Pedidos para hoje;
 - Orçamentos pendentes;
-- Artes aguardando aprovação;
 - Estoque crítico;
 - Lucro estimado;
 - Ticket médio;
@@ -212,9 +215,11 @@ Funcionalidades:
 - criar orçamento;
 - duplicar orçamento;
 - alterar status;
-- exportar PDF;
+- exportar PDF em formato profissional de proposta comercial;
 - converter orçamento em pedido;
 - enviar orçamento para lixeira.
+
+O PDF do orçamento possui hierarquia visual com cabeçalho da Artes Lion, dados do cliente, número do orçamento, emissão, validade, tabela com tudo o que foi orçado, resumo financeiro, condições comerciais, observações, anexos e área para assinatura.
 
 Quando o orçamento é aprovado, o sistema pergunta se o usuário deseja gerar um pedido a partir dele.
 
@@ -368,6 +373,8 @@ O usuário pode alterar o status de produção diretamente no Kanban.
 
 A aba **Estoque** controla materiais, insumos e produtos disponíveis.
 
+O estoque pode ser alimentado manualmente pelo formulário **Cadastrar material**.
+
 Cada item possui:
 
 - material;
@@ -385,6 +392,8 @@ Também é possível registrar:
 
 - entrada de estoque;
 - saída de estoque.
+
+Ao criar um pedido, o usuário pode escolher o material do estoque e informar a quantidade utilizada. Quando o pedido é salvo, o sistema baixa automaticamente essa quantidade do item correspondente. Se não houver saldo suficiente, o pedido não é salvo até corrigir o material ou a quantidade.
 
 Itens com estoque baixo aparecem nos alertas do Dashboard.
 
@@ -413,6 +422,19 @@ Ela ajuda a entender:
 - o que saiu;
 - o que está previsto;
 - o saldo acumulado.
+
+Também permite lançar custos da empresa diretamente, como:
+
+- marketing;
+- custo operacional;
+- transporte;
+- luz;
+- funcionário;
+- aluguel;
+- internet;
+- fornecedor;
+- material;
+- outros custos.
 
 Cada linha mostra:
 
@@ -462,7 +484,47 @@ Funcionalidades:
 
 Ao registrar uma compra, o sistema pode atualizar estoque, financeiro e fluxo de caixa.
 
-## 16. Relatórios
+## 16. Funcionários
+
+A aba **Funcionários** serve para controlar equipe, salários, faltas, vales e descontos automáticos.
+
+O dashboard da equipe mostra:
+
+- total de funcionários ativos;
+- total de salários combinados;
+- total de faltas no período;
+- faltas descontadas;
+- faltas justificadas por atestado;
+- total de vales pagos;
+- descontos automáticos;
+- total final a pagar.
+
+No cadastro do funcionário, informe:
+
+- nome;
+- função;
+- salário combinado;
+- status ativo ou inativo.
+
+O valor da diária é calculado automaticamente com base no salário dividido por 30.
+
+Na ficha individual, o sistema mostra faltas registradas, vales registrados, descontos aplicados, salário final do período e histórico de ocorrências.
+
+Ao registrar uma falta por **Doença**, o sistema exige anexo de atestado médico. Com atestado, a diária não é descontada. Sem atestado, o sistema não salva a falta como doença justificada.
+
+Quando a falta for **Falta sem justificativa** ou **Outro motivo**, o sistema desconta automaticamente o valor da diária do salário final.
+
+Ao registrar um vale, é obrigatório anexar comprovante de pagamento. Todo vale registrado é descontado automaticamente do salário final.
+
+O cálculo usado é:
+
+```text
+Salário final = salário combinado - faltas descontadas - vales
+```
+
+Também é possível ativar ou inativar funcionários sem apagar o histórico.
+
+## 17. Relatórios
 
 A aba **Relatórios** mostra resumos gerenciais.
 
@@ -476,7 +538,7 @@ Relatórios disponíveis:
 
 Os relatórios podem ser exportados em PDF.
 
-## 17. Exportações
+## 18. Exportações
 
 A aba **Exportações** permite exportar dados do sistema.
 
@@ -487,7 +549,10 @@ Exportações disponíveis:
 - Pedidos;
 - Lembretes;
 - Estoque;
-- Financeiro.
+- Financeiro;
+- Funcionários;
+- Faltas;
+- Vales.
 
 Os dados podem ser exportados em:
 
@@ -496,7 +561,7 @@ Os dados podem ser exportados em:
 
 Itens enviados para a Lixeira não entram nas exportações principais.
 
-## 18. Lixeira
+## 19. Lixeira
 
 A aba **Lixeira** guarda itens removidos sem apagar definitivamente.
 
@@ -519,11 +584,11 @@ Itens na Lixeira não interferem em:
 
 Se um pedido for enviado para a Lixeira, as movimentações financeiras vinculadas a ele também saem dos cálculos.
 
-Se um cliente for enviado para a Lixeira, seus pedidos, orçamentos, artes e movimentações vinculadas também saem dos cálculos.
+Se um cliente for enviado para a Lixeira, seus pedidos, orçamentos e movimentações vinculadas também saem dos cálculos.
 
 Para trazer um item de volta, clique em **Resgatar**.
 
-## 19. Configurações
+## 20. Configurações
 
 A aba **Configurações** mostra informações gerais do sistema e da empresa.
 
@@ -544,22 +609,23 @@ Ela apresenta:
 - estrutura sugerida de banco de dados;
 - orientação sobre acesso online.
 
-## 20. Primeiros Passos Recomendados
+## 21. Primeiros Passos Recomendados
 
 Depois do reset, siga esta ordem:
 
 1. Cadastre os fornecedores principais.
 2. Cadastre os itens de estoque.
-3. Cadastre os clientes.
-4. Crie orçamentos quando houver solicitação.
-5. Converta orçamento aprovado em pedido.
-6. Registre pagamentos.
-7. Acompanhe produção pelo Kanban.
-8. Use o Dashboard para acompanhar caixa, atrasos e estoque crítico.
-9. Use Lembretes para tarefas e cobranças.
-10. Exporte relatórios quando precisar analisar ou enviar dados.
+3. Cadastre os funcionários.
+4. Cadastre os clientes.
+5. Crie orçamentos quando houver solicitação.
+6. Converta orçamento aprovado em pedido.
+7. Registre pagamentos.
+8. Acompanhe produção pelo Kanban.
+9. Use o Dashboard para acompanhar caixa, atrasos e estoque crítico.
+10. Use Lembretes para tarefas e cobranças.
+11. Exporte relatórios quando precisar analisar ou enviar dados.
 
-## 21. Acesso Online Futuro
+## 22. Acesso Online Futuro
 
 Atualmente o sistema roda localmente.
 
@@ -575,7 +641,7 @@ Com Vercel + Supabase:
 - usuários autorizados conseguem acessar os mesmos dados;
 - relatórios e gráficos passam a refletir a base online.
 
-## 22. Cuidados Importantes
+## 23. Cuidados Importantes
 
 - O login atual é administrativo único.
 - Não compartilhe a senha com pessoas não autorizadas.

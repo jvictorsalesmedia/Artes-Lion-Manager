@@ -231,6 +231,34 @@ textarea:focus {
   gap: 0.78rem;
 }
 
+.period-filter {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  padding: 0.35rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.period-filter label {
+  display: grid;
+  gap: 0.18rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.period-filter select,
+.period-filter input {
+  min-height: 34px;
+  width: auto;
+  max-width: 145px;
+  padding: 0.42rem 0.55rem;
+  font-size: 0.82rem;
+}
+
 .topbar-left strong {
   display: block;
 }
@@ -1230,11 +1258,42 @@ textarea:focus {
 
 @media (max-width: 760px) {
   .topbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    min-height: auto;
     padding: 0 0.85rem;
+  }
+
+  .topbar-left {
+    flex: 1 1 100%;
+    padding-top: 0.75rem;
+  }
+
+  .topbar-user {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding-bottom: 0.75rem;
   }
 
   .topbar-user span {
     display: none;
+  }
+
+  .period-filter {
+    flex: 1 1 260px;
+    flex-wrap: wrap;
+  }
+
+  .period-filter label {
+    flex: 1 1 118px;
+  }
+
+  .period-filter select,
+  .period-filter input {
+    width: 100%;
+    max-width: none;
   }
 
   .content-area {

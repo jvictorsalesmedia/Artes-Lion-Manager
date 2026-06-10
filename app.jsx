@@ -18,6 +18,7 @@ const MENU = [
   { id: "fluxo", label: "Fluxo de Caixa", icon: "chart-no-axes-combined" },
   { id: "produtos", label: "Produtos e Serviços", icon: "shirt" },
   { id: "fornecedores", label: "Fornecedores", icon: "truck" },
+  { id: "funcionarios", label: "Funcionários", icon: "id-card" },
   { id: "relatorios", label: "Relatórios", icon: "bar-chart-3" },
   { id: "exportacoes", label: "Exportações", icon: "download" },
   { id: "lixeira", label: "Lixeira", icon: "trash-2" },
@@ -562,7 +563,7 @@ const initialReminders = [
 
 const permissions = [
   { role: "Administrador", access: "Acesso total, usuários, financeiro, relatórios e configurações" },
-  { role: "Produção", access: "Pedidos, produção, artes, estoque operacional e histórico" },
+  { role: "Produção", access: "Pedidos, produção, estoque operacional e histórico" },
   { role: "Financeiro", access: "Financeiro, fluxo de caixa, relatórios e exportações" },
   { role: "Atendimento", access: "Clientes, orçamentos, pedidos e mensagens WhatsApp" },
 ];
@@ -586,6 +587,10 @@ const initialUsers = [
   },
 ];
 
+const initialEmployees = [];
+const initialEmployeeAbsences = [];
+const initialEmployeeAdvances = [];
+
 function asDate(value) {
   return new Date(`${value}T12:00:00`);
 }
@@ -593,6 +598,61 @@ function asDate(value) {
 function dateLabel(value) {
   if (!value) return "-";
   return new Intl.DateTimeFormat("pt-BR").format(asDate(value));
+}
+
+function isoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfDay(date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function endOfDay(date) {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+}
+
+function startOfMonth(date) {
+  return startOfDay(new Date(date.getFullYear(), date.getMonth(), 1));
+}
+
+function startOfYear(date) {
+  return startOfDay(new Date(date.getFullYear(), 0, 1));
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function getPeriodRange(mode, customStart, customEnd) {
+  const now = new Date();
+  const end = endOfDay(now);
+  if (mode === "semana") return { start: startOfDay(addDays(now, -6)), end, label: "Semana" };
+  if (mode === "quinzena") return { start: startOfDay(addDays(now, -14)), end, label: "Quinzena" };
+  if (mode === "mes") return { start: startOfMonth(now), end, label: "Mês" };
+  if (mode === "trimestre") return { start: startOfDay(new Date(now.getFullYear(), now.getMonth() - 2, 1)), end, label: "Trimestre" };
+  if (mode === "semestre") return { start: startOfDay(new Date(now.getFullYear(), now.getMonth() - 5, 1)), end, label: "Semestre" };
+  if (mode === "anual") return { start: startOfYear(now), end, label: "Ano" };
+  if (mode === "personalizado") {
+    return {
+      start: startOfDay(asDate(customStart || isoDate(now))),
+      end: endOfDay(asDate(customEnd || isoDate(now))),
+      label: "Personalizado",
+    };
+  }
+  return { start: new Date("2000-01-01T00:00:00"), end, label: "Geral" };
+}
+
+function isWithinPeriod(value, range) {
+  if (!value) return true;
+  const date = asDate(value);
+  return date >= range.start && date <= range.end;
 }
 
 function timeLabel(value) {
@@ -1933,6 +1993,66 @@ function ArtworksView({ artworks, setArtworks, orders, setOrders, clients, openW
 }
 
 function StockView({ stock, setStock, exportExcel, exportPDF, showToast }) {
+  const [form, setForm] = useState({
+    item: "",
+    category: "Camisas",
+    unit: "un",
+    qty: 0,
+    min: 0,
+    avgCost: 0,
+    supplier: "",
+  });
+
+  function update(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function saveStockItem(event) {
+    event.preventDefault();
+    if (!form.item.trim()) {
+      showToast("Informe o nome do material.");
+      return;
+    }
+    const materialName = form.item.trim();
+    const qty = parseCurrencyInput(form.qty);
+    const min = parseCurrencyInput(form.min);
+    const avgCost = parseCurrencyInput(form.avgCost);
+    const existing = stock.find((item) => item.item.toLowerCase() === materialName.toLowerCase());
+    if (existing) {
+      setStock((items) =>
+        items.map((item) =>
+          item.id === existing.id
+            ? {
+                ...item,
+                category: form.category.trim() || item.category || "Material",
+                unit: form.unit.trim() || item.unit || "un",
+                qty: Number(item.qty || 0) + qty,
+                min,
+                avgCost,
+                supplier: form.supplier.trim() || item.supplier || "-",
+              }
+            : item
+        )
+      );
+    } else {
+      setStock((items) => [
+        {
+          id: Date.now(),
+          item: materialName,
+          category: form.category.trim() || "Material",
+          unit: form.unit.trim() || "un",
+          qty,
+          min,
+          avgCost,
+          supplier: form.supplier.trim() || "-",
+        },
+        ...items,
+      ]);
+    }
+    setForm({ item: "", category: "Camisas", unit: "un", qty: 0, min: 0, avgCost: 0, supplier: "" });
+    showToast(existing ? "Material existente atualizado no estoque." : "Material cadastrado no estoque.");
+  }
+
   function adjustStock(item, direction) {
     const raw = window.prompt(direction === "in" ? "Quantidade de entrada:" : "Quantidade de saída:");
     const qty = parseCurrencyInput(raw);
@@ -1955,6 +2075,24 @@ function StockView({ stock, setStock, exportExcel, exportPDF, showToast }) {
           </>
         }
       />
+      <article className="panel stock-form-panel">
+        <div className="panel-title">
+          <h2>Cadastrar material</h2>
+          <span>Use nomes claros para vincular ao pedido</span>
+        </div>
+        <form className="form-grid" onSubmit={saveStockItem}>
+          <label>Nome do material<input value={form.item} onChange={(event) => update("item", event.target.value)} placeholder="Ex.: Camisa algodão branca P" required /></label>
+          <label>Categoria<input value={form.category} onChange={(event) => update("category", event.target.value)} placeholder="Camisas, Brindes, Insumos" /></label>
+          <label>Unidade<input value={form.unit} onChange={(event) => update("unit", event.target.value)} placeholder="un, m, kg, ml" /></label>
+          <label>Quantidade atual<input type="number" value={form.qty} onChange={(event) => update("qty", event.target.value)} min="0" step="0.01" /></label>
+          <label>Estoque mínimo<input type="number" value={form.min} onChange={(event) => update("min", event.target.value)} min="0" step="0.01" /></label>
+          <label>Custo médio<input value={form.avgCost} onChange={(event) => update("avgCost", event.target.value)} /></label>
+          <label className="span-2">Fornecedor<input value={form.supplier} onChange={(event) => update("supplier", event.target.value)} /></label>
+          <div className="form-actions span-2">
+            <Button icon="save">Cadastrar material</Button>
+          </div>
+        </form>
+      </article>
       <article className="panel">
         <div className="table-scroll">
           <table>
@@ -2079,7 +2217,43 @@ function FinanceView({ transactions, orders, clients, exportExcel, exportPDF, re
   );
 }
 
-function CashFlowView({ transactions, orders }) {
+function CashFlowView({ transactions, orders, setTransactions, showToast }) {
+  const [expenseForm, setExpenseForm] = useState({
+    date: isoDate(new Date()),
+    description: "",
+    category: "Marketing",
+    amount: 0,
+    status: "pago",
+  });
+
+  function updateExpense(field, value) {
+    setExpenseForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function saveExpense(event) {
+    event.preventDefault();
+    const amount = parseCurrencyInput(expenseForm.amount);
+    if (!expenseForm.description.trim() || amount <= 0) {
+      showToast("Informe descrição e valor do custo.");
+      return;
+    }
+    setTransactions((items) => [
+      {
+        id: Date.now(),
+        date: expenseForm.date,
+        description: expenseForm.description.trim(),
+        category: expenseForm.category,
+        type: "despesa",
+        amount,
+        status: expenseForm.status,
+        orderNumber: "",
+      },
+      ...items,
+    ]);
+    setExpenseForm({ date: isoDate(new Date()), description: "", category: "Marketing", amount: 0, status: "pago" });
+    showToast("Custo lançado no fluxo de caixa.");
+  }
+
   const projections = [
     ...transactions.map((item) => ({
       date: item.date,
@@ -2117,6 +2291,26 @@ function CashFlowView({ transactions, orders }) {
     <>
       <PageHeader title="Fluxo de Caixa" subtitle="Entradas, saídas e saldo projetado" />
       <section className="dashboard-layout">
+        <article className="panel wide">
+          <div className="panel-title">
+            <h2>Lançar custo da empresa</h2>
+            <span>Despesa entra no financeiro e fluxo de caixa</span>
+          </div>
+          <form className="form-grid" onSubmit={saveExpense}>
+            <label>Data<input type="date" value={expenseForm.date} onChange={(event) => updateExpense("date", event.target.value)} /></label>
+            <label>Categoria<select value={expenseForm.category} onChange={(event) => updateExpense("category", event.target.value)}>
+              {["Marketing", "Custo operacional", "Transporte", "Luz", "Funcionário", "Aluguel", "Internet", "Fornecedor", "Material", "Outro"].map((item) => <option key={item}>{item}</option>)}
+            </select></label>
+            <label>Valor<input value={expenseForm.amount} onChange={(event) => updateExpense("amount", event.target.value)} /></label>
+            <label>Status<select value={expenseForm.status} onChange={(event) => updateExpense("status", event.target.value)}>
+              {["pago", "pendente", "vencido"].map((item) => <option key={item}>{item}</option>)}
+            </select></label>
+            <label className="span-2">Descrição<input value={expenseForm.description} onChange={(event) => updateExpense("description", event.target.value)} placeholder="Ex.: campanha Instagram, conta de luz, transporte de entrega" /></label>
+            <div className="form-actions span-2">
+              <Button icon="plus">Lançar custo</Button>
+            </div>
+          </form>
+        </article>
         <article className="panel wide">
           <div className="panel-title">
             <h2>Fluxo diário</h2>
@@ -2277,6 +2471,290 @@ function SupplierForm({ onSave, onCancel }) {
         <Button icon="save">Salvar fornecedor</Button>
       </div>
     </form>
+  );
+}
+
+function EmployeesView({ employees, setEmployees, absences, setAbsences, advances, setAdvances, periodRange, showToast }) {
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
+  const [employeeForm, setEmployeeForm] = useState({ name: "", role: "", salary: 0, status: "ativo" });
+  const [absenceForm, setAbsenceForm] = useState({ employeeId: "", date: isoDate(new Date()), reason: "Falta sem justificativa", note: "", certificateName: "" });
+  const [advanceForm, setAdvanceForm] = useState({ employeeId: "", date: isoDate(new Date()), amount: 0, receiptName: "", note: "" });
+
+  const activeEmployees = employees.filter((employee) => employee.status === "ativo");
+  const periodAbsences = absences.filter((item) => isWithinPeriod(item.date, periodRange));
+  const periodAdvances = advances.filter((item) => isWithinPeriod(item.date, periodRange));
+  const selected = employees.find((employee) => employee.id === selectedEmployeeId) || employees[0];
+
+  function dailyValue(employee) {
+    return Number(employee?.salary || 0) / 30;
+  }
+
+  function employeeAbsences(employeeId) {
+    return periodAbsences.filter((item) => item.employeeId === employeeId);
+  }
+
+  function employeeAdvances(employeeId) {
+    return periodAdvances.filter((item) => item.employeeId === employeeId);
+  }
+
+  function absenceDiscount(employee) {
+    return employeeAbsences(employee.id).filter((item) => item.deduct).length * dailyValue(employee);
+  }
+
+  function advanceDiscount(employee) {
+    return employeeAdvances(employee.id).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }
+
+  function finalSalary(employee) {
+    return Math.max(0, Number(employee.salary || 0) - absenceDiscount(employee) - advanceDiscount(employee));
+  }
+
+  const totalSalary = activeEmployees.reduce((sum, employee) => sum + Number(employee.salary || 0), 0);
+  const totalAbsenceDiscount = activeEmployees.reduce((sum, employee) => sum + absenceDiscount(employee), 0);
+  const totalAdvances = periodAdvances.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const justifiedAbsences = periodAbsences.filter((item) => item.reason === "Doença" && item.certificateName).length;
+  const deductedAbsences = periodAbsences.filter((item) => item.deduct).length;
+  const finalPayroll = activeEmployees.reduce((sum, employee) => sum + finalSalary(employee), 0);
+
+  function saveEmployee(event) {
+    event.preventDefault();
+    if (!employeeForm.name.trim()) {
+      showToast("Informe o nome do funcionário.");
+      return;
+    }
+    const employee = {
+      id: Date.now(),
+      name: employeeForm.name.trim(),
+      role: employeeForm.role.trim() || "Funcionário",
+      salary: parseCurrencyInput(employeeForm.salary),
+      status: employeeForm.status,
+      createdAt: isoDate(new Date()),
+    };
+    setEmployees((items) => [employee, ...items]);
+    setSelectedEmployeeId(employee.id);
+    setEmployeeForm({ name: "", role: "", salary: 0, status: "ativo" });
+    showToast("Funcionário cadastrado.");
+  }
+
+  function saveAbsence(event) {
+    event.preventDefault();
+    const employeeId = Number(absenceForm.employeeId || selected?.id);
+    if (!employeeId) {
+      showToast("Selecione um funcionário.");
+      return;
+    }
+    if (absenceForm.reason === "Doença" && !absenceForm.certificateName) {
+      showToast("Para doença, anexe a foto do atestado médico.");
+      return;
+    }
+    setAbsences((items) => [
+      {
+        id: Date.now(),
+        employeeId,
+        date: absenceForm.date,
+        reason: absenceForm.reason,
+        note: absenceForm.note,
+        certificateName: absenceForm.certificateName,
+        deduct: absenceForm.reason !== "Doença",
+      },
+      ...items,
+    ]);
+    setAbsenceForm({ employeeId: "", date: isoDate(new Date()), reason: "Falta sem justificativa", note: "", certificateName: "" });
+    showToast("Falta registrada.");
+  }
+
+  function saveAdvance(event) {
+    event.preventDefault();
+    const employeeId = Number(advanceForm.employeeId || selected?.id);
+    const amount = parseCurrencyInput(advanceForm.amount);
+    if (!employeeId || amount <= 0) {
+      showToast("Selecione funcionário e valor do vale.");
+      return;
+    }
+    if (!advanceForm.receiptName) {
+      showToast("Anexe o comprovante de pagamento do vale.");
+      return;
+    }
+    setAdvances((items) => [
+      {
+        id: Date.now(),
+        employeeId,
+        date: advanceForm.date,
+        amount,
+        receiptName: advanceForm.receiptName,
+        note: advanceForm.note,
+      },
+      ...items,
+    ]);
+    setAdvanceForm({ employeeId: "", date: isoDate(new Date()), amount: 0, receiptName: "", note: "" });
+    showToast("Vale registrado e descontado automaticamente.");
+  }
+
+  function toggleEmployeeStatus(employee) {
+    const nextStatus = employee.status === "ativo" ? "inativo" : "ativo";
+    setEmployees((items) => items.map((item) => (item.id === employee.id ? { ...item, status: nextStatus } : item)));
+    showToast(`${employee.name} marcado como ${nextStatus}.`);
+  }
+
+  return (
+    <>
+      <PageHeader title="Funcionários" subtitle="Equipe, faltas, vales, descontos e salário final do período" />
+
+      <section className="metric-grid compact-metrics">
+        <MetricCard icon="users" label="Funcionários ativos" value={activeEmployees.length} helper={`${employees.length} cadastrados`} />
+        <MetricCard icon="wallet" label="Salários combinados" value={BRL.format(totalSalary)} helper="Funcionários ativos" tone="gold" />
+        <MetricCard icon="calendar-x" label="Faltas no período" value={periodAbsences.length} helper={`${deductedAbsences} descontadas`} tone="warning" />
+        <MetricCard icon="file-check-2" label="Faltas com atestado" value={justifiedAbsences} helper="Sem desconto de diária" tone="success" />
+        <MetricCard icon="hand-coins" label="Vales pagos" value={BRL.format(totalAdvances)} helper={`${periodAdvances.length} lançamentos`} tone="warning" />
+        <MetricCard icon="minus-circle" label="Descontos automáticos" value={BRL.format(totalAbsenceDiscount + totalAdvances)} helper="Faltas + vales" tone="danger" />
+        <MetricCard icon="badge-dollar-sign" label="Total final a pagar" value={BRL.format(finalPayroll)} helper={periodRange.label} tone="success" />
+      </section>
+
+      <section className="split-layout">
+        <article className="panel">
+          <div className="panel-title">
+            <h2>Cadastrar funcionário</h2>
+            <span>Diária calculada automaticamente</span>
+          </div>
+          <form className="form-grid" onSubmit={saveEmployee}>
+            <label>Nome<input value={employeeForm.name} onChange={(event) => setEmployeeForm((current) => ({ ...current, name: event.target.value }))} required /></label>
+            <label>Função<input value={employeeForm.role} onChange={(event) => setEmployeeForm((current) => ({ ...current, role: event.target.value }))} /></label>
+            <label>Salário combinado<input value={employeeForm.salary} onChange={(event) => setEmployeeForm((current) => ({ ...current, salary: event.target.value }))} /></label>
+            <label>Status<select value={employeeForm.status} onChange={(event) => setEmployeeForm((current) => ({ ...current, status: event.target.value }))}>
+              <option>ativo</option>
+              <option>inativo</option>
+            </select></label>
+            <div className="span-2 internal-note">Valor da diária: {BRL.format(parseCurrencyInput(employeeForm.salary) / 30)}</div>
+            <div className="form-actions span-2">
+              <Button icon="save">Salvar funcionário</Button>
+            </div>
+          </form>
+        </article>
+
+        <aside className="panel detail-panel">
+          <div className="panel-title">
+            <h2>Ficha individual</h2>
+            <span>{selected?.name || "Selecione um funcionário"}</span>
+          </div>
+          {selected ? (
+            <>
+              <dl className="data-list compact">
+                <div><dt>Nome</dt><dd>{selected.name}</dd></div>
+                <div><dt>Função</dt><dd>{selected.role}</dd></div>
+                <div><dt>Salário combinado</dt><dd>{BRL.format(selected.salary)}</dd></div>
+                <div><dt>Valor da diária</dt><dd>{BRL.format(dailyValue(selected))}</dd></div>
+                <div><dt>Status</dt><dd>{selected.status}</dd></div>
+                <div><dt>Faltas registradas</dt><dd>{employeeAbsences(selected.id).length}</dd></div>
+                <div><dt>Vales registrados</dt><dd>{BRL.format(advanceDiscount(selected))}</dd></div>
+                <div><dt>Descontos aplicados</dt><dd>{BRL.format(absenceDiscount(selected) + advanceDiscount(selected))}</dd></div>
+                <div><dt>Salário final</dt><dd>{BRL.format(finalSalary(selected))}</dd></div>
+              </dl>
+              <div className="mini-section">
+                <h3>Ocorrências</h3>
+                {[...employeeAbsences(selected.id).map((item) => ({ date: item.date, text: `Falta: ${item.reason}${item.certificateName ? ` · Atestado: ${item.certificateName}` : ""}` })), ...employeeAdvances(selected.id).map((item) => ({ date: item.date, text: `Vale: ${BRL.format(item.amount)} · Comprovante: ${item.receiptName}` }))].sort((a, b) => asDate(b.date) - asDate(a.date)).map((item, index) => (
+                  <div className="timeline-row" key={`${item.text}-${index}`}>
+                    <span>{dateLabel(item.date)}</span>
+                    <p>{item.text}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <EmptyState title="Nenhum funcionário" text="Cadastre um funcionário para ver a ficha individual." />
+          )}
+        </aside>
+      </section>
+
+      <section className="split-layout">
+        <article className="panel">
+          <div className="panel-title">
+            <h2>Registrar falta</h2>
+          </div>
+          <form className="form-grid" onSubmit={saveAbsence}>
+            <label>Funcionário<select value={absenceForm.employeeId || selected?.id || ""} onChange={(event) => setAbsenceForm((current) => ({ ...current, employeeId: event.target.value }))}>
+              <option value="">Selecione</option>
+              {employees.map((employee) => <option value={employee.id} key={employee.id}>{employee.name}</option>)}
+            </select></label>
+            <label>Data da falta<input type="date" value={absenceForm.date} onChange={(event) => setAbsenceForm((current) => ({ ...current, date: event.target.value }))} /></label>
+            <label>Motivo<select value={absenceForm.reason} onChange={(event) => setAbsenceForm((current) => ({ ...current, reason: event.target.value, certificateName: event.target.value === "Doença" ? current.certificateName : "" }))}>
+              <option>Doença</option>
+              <option>Falta sem justificativa</option>
+              <option>Outro motivo</option>
+            </select></label>
+            <label>Atestado médico<input type="file" accept="image/*,.pdf" onChange={(event) => setAbsenceForm((current) => ({ ...current, certificateName: event.target.files?.[0]?.name || "" }))} /></label>
+            <label className="span-2">Observação<textarea value={absenceForm.note} onChange={(event) => setAbsenceForm((current) => ({ ...current, note: event.target.value }))} /></label>
+            <div className="form-actions span-2">
+              <Button icon="calendar-x">Registrar falta</Button>
+            </div>
+          </form>
+        </article>
+
+        <article className="panel">
+          <div className="panel-title">
+            <h2>Registrar vale</h2>
+          </div>
+          <form className="form-grid" onSubmit={saveAdvance}>
+            <label>Funcionário<select value={advanceForm.employeeId || selected?.id || ""} onChange={(event) => setAdvanceForm((current) => ({ ...current, employeeId: event.target.value }))}>
+              <option value="">Selecione</option>
+              {employees.map((employee) => <option value={employee.id} key={employee.id}>{employee.name}</option>)}
+            </select></label>
+            <label>Data do vale<input type="date" value={advanceForm.date} onChange={(event) => setAdvanceForm((current) => ({ ...current, date: event.target.value }))} /></label>
+            <label>Valor do vale<input value={advanceForm.amount} onChange={(event) => setAdvanceForm((current) => ({ ...current, amount: event.target.value }))} /></label>
+            <label>Comprovante<input type="file" accept="image/*,.pdf" onChange={(event) => setAdvanceForm((current) => ({ ...current, receiptName: event.target.files?.[0]?.name || "" }))} /></label>
+            <label className="span-2">Observação<textarea value={advanceForm.note} onChange={(event) => setAdvanceForm((current) => ({ ...current, note: event.target.value }))} /></label>
+            <div className="form-actions span-2">
+              <Button icon="hand-coins">Registrar vale</Button>
+            </div>
+          </form>
+        </article>
+      </section>
+
+      <article className="panel">
+        <div className="panel-title">
+          <h2>Lista de funcionários</h2>
+          <span>{employees.length} cadastrados</span>
+        </div>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Função</th>
+                <th>Salário combinado</th>
+                <th>Diária</th>
+                <th>Faltas no período</th>
+                <th>Vales recebidos</th>
+                <th>Descontos automáticos</th>
+                <th>Salário final previsto</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((employee) => (
+                <tr key={employee.id}>
+                  <td>{employee.name}</td>
+                  <td>{employee.role}</td>
+                  <td>{BRL.format(employee.salary)}</td>
+                  <td>{BRL.format(dailyValue(employee))}</td>
+                  <td>{employeeAbsences(employee.id).length}</td>
+                  <td>{BRL.format(advanceDiscount(employee))}</td>
+                  <td>{BRL.format(absenceDiscount(employee) + advanceDiscount(employee))}</td>
+                  <td>{BRL.format(finalSalary(employee))}</td>
+                  <td>
+                    <div className="row-actions">
+                      <Button variant="secondary" icon="eye" onClick={() => setSelectedEmployeeId(employee.id)}>Ver</Button>
+                      <Button variant="ghost" icon={employee.status === "ativo" ? "user-x" : "user-check"} onClick={() => toggleEmployeeStatus(employee)}>
+                        {employee.status === "ativo" ? "Inativar" : "Ativar"}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </>
   );
 }
 
@@ -2449,7 +2927,7 @@ function ReportsView({ clients, orders, stock, transactions, exportPDF }) {
   );
 }
 
-function ExportsView({ clients, quotes, orders, stock, transactions, reminders, exportExcel, exportPDF, exportDashboardPDF }) {
+function ExportsView({ clients, quotes, orders, stock, transactions, reminders, employees, employeeAbsences, employeeAdvances, exportExcel, exportPDF, exportDashboardPDF }) {
   const exports = [
     { label: "Clientes", data: clients, columns: ["name", "phone", "type", "status"] },
     { label: "Orçamentos", data: quotes, columns: ["number", "product", "total", "status"] },
@@ -2457,6 +2935,9 @@ function ExportsView({ clients, quotes, orders, stock, transactions, reminders, 
     { label: "Lembretes", data: reminders, columns: ["date", "time", "title", "status"] },
     { label: "Estoque", data: stock, columns: ["item", "qty", "min", "supplier"] },
     { label: "Financeiro", data: transactions, columns: ["date", "description", "type", "amount", "status"] },
+    { label: "Funcionários", data: employees, columns: ["name", "role", "salary", "status"] },
+    { label: "Faltas", data: employeeAbsences, columns: ["date", "employeeId", "reason", "deduct", "certificateName"] },
+    { label: "Vales", data: employeeAdvances, columns: ["date", "employeeId", "amount", "receiptName"] },
   ];
 
   return (
@@ -2575,7 +3056,7 @@ function SettingsView({ users, currentUser, deleteUser, recreateTestUser }) {
     "Pedido pronto abre WhatsApp com mensagem personalizada.",
     "Toda ação importante fica registrada no histórico do pedido.",
   ];
-  const schema = ["clientes", "orcamentos", "pedidos", "itens_pedido", "artes", "estoque", "movimentacoes_estoque", "financeiro", "fornecedores", "usuarios", "historico_pedido"];
+  const schema = ["clientes", "orcamentos", "pedidos", "itens_pedido", "estoque", "movimentacoes_estoque", "financeiro", "fornecedores", "funcionarios", "faltas_funcionarios", "vales_funcionarios", "usuarios", "historico_pedido", "lixeira"];
 
   return (
     <>
@@ -2739,7 +3220,7 @@ function ClientForm({ onSave, onCancel }) {
   );
 }
 
-function OrderForm({ clients, onSave, onCancel, initialQuote }) {
+function OrderForm({ clients, stock, onSave, onCancel, initialQuote }) {
   const [form, setForm] = useState({
     clientId: initialQuote?.clientId || clients[0]?.id || "",
     quoteNumber: initialQuote?.number || "",
@@ -2755,6 +3236,8 @@ function OrderForm({ clients, onSave, onCancel, initialQuote }) {
     deposit: 0,
     cost: initialQuote ? Math.round(initialQuote.total * 0.56) : 0,
     responsible: "Carol",
+    stockItemId: "",
+    stockQty: initialQuote?.quantity || 1,
   });
 
   function update(field, value) {
@@ -2782,6 +3265,9 @@ function OrderForm({ clients, onSave, onCancel, initialQuote }) {
       total,
       deposit,
       cost: parseCurrencyInput(form.cost),
+      stockItemId: form.stockItemId ? Number(form.stockItemId) : "",
+      stockQty: parseCurrencyInput(form.stockQty),
+      stockItemName: stock.find((item) => item.id === Number(form.stockItemId))?.item || "",
       productionStatus: deposit > 0 ? "Arte em criação" : "Aguardando pagamento",
       financialStatus: deposit > 0 ? "Entrada recebida" : "Não pago",
       responsible: form.responsible,
@@ -2807,6 +3293,11 @@ function OrderForm({ clients, onSave, onCancel, initialQuote }) {
         {SERVICES.map((value) => <option key={value}>{value}</option>)}
       </select></label>
       <label>Quantidade<input type="number" value={form.quantity} onChange={(event) => update("quantity", event.target.value)} min="1" /></label>
+      <label>Material do estoque<select value={form.stockItemId} onChange={(event) => update("stockItemId", event.target.value)}>
+        <option value="">Não baixar estoque agora</option>
+        {stock.map((item) => <option value={item.id} key={item.id}>{item.item} ({item.qty} {item.unit})</option>)}
+      </select></label>
+      <label>Quantidade a baixar<input type="number" value={form.stockQty} onChange={(event) => update("stockQty", event.target.value)} min="0" step="0.01" /></label>
       <label>Tamanhos<input value={form.sizes} onChange={(event) => update("sizes", event.target.value)} /></label>
       <label>Cores<input value={form.colors} onChange={(event) => update("colors", event.target.value)} /></label>
       <label>Valor total<input value={form.total} onChange={(event) => update("total", event.target.value)} /></label>
@@ -2887,6 +3378,9 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [activeModule, setActiveModule] = useState("dashboard");
+  const [periodMode, setPeriodMode] = useState("geral");
+  const [customStart, setCustomStart] = useState(isoDate(new Date()));
+  const [customEnd, setCustomEnd] = useState(isoDate(new Date()));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [clients, setClients] = useStoredState("alm_prod_clients", []);
   const [orders, setOrders] = useStoredState("alm_prod_orders", []);
@@ -2896,6 +3390,9 @@ function App() {
   const [transactions, setTransactions] = useStoredState("alm_prod_transactions", []);
   const [suppliers, setSuppliers] = useStoredState("alm_prod_suppliers", []);
   const [reminders, setReminders] = useStoredState("alm_prod_reminders", []);
+  const [employees, setEmployees] = useStoredState("alm_prod_employees", initialEmployees);
+  const [employeeAbsences, setEmployeeAbsences] = useStoredState("alm_prod_employee_absences", initialEmployeeAbsences);
+  const [employeeAdvances, setEmployeeAdvances] = useStoredState("alm_prod_employee_advances", initialEmployeeAdvances);
   const [trashItems, setTrashItems] = useStoredState("alm_prod_trash", []);
   const [users, setUsers] = useStoredState("alm_prod_users", initialUsers);
   const [modal, setModal] = useState(null);
@@ -3232,23 +3729,231 @@ function App() {
   }
 
   function exportQuotePDF(quote) {
+    if (!window.jspdf) {
+      window.alert("Biblioteca jsPDF não carregada.");
+      return;
+    }
     const client = clientForId(quote.clientId);
-    exportPDF(`Orçamento ${quote.number}`, [
-      {
-        orcamento: quote.number,
-        cliente: client?.name,
-        telefone: client?.phone,
-        produto: quote.product,
-        servico: quote.service,
-        quantidade: quote.quantity,
-        unitario: BRL.format(quote.unitValue),
-        desconto: BRL.format(quote.discount),
-        total: BRL.format(quote.total),
-        pagamento: quote.payment,
-        validade: dateLabel(quote.validUntil),
-        observacoes: quote.notes,
-      },
-    ], ["orcamento", "cliente", "telefone", "produto", "servico", "quantidade", "unitario", "desconto", "total", "pagamento", "validade", "observacoes"]);
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
+    const page = { width: doc.internal.pageSize.getWidth(), height: doc.internal.pageSize.getHeight(), margin: 40 };
+    const gold = [215, 169, 0];
+    const graphite = [23, 23, 23];
+    const muted = [98, 105, 116];
+    const line = [221, 225, 231];
+    let y = 42;
+
+    const quoteItems = Array.isArray(quote.items) && quote.items.length
+      ? quote.items
+      : [
+          {
+            description: quote.product || "Item orçado",
+            service: quote.service || "-",
+            quantity: quote.quantity || 1,
+            unitValue: quote.unitValue || 0,
+            discount: quote.discount || 0,
+            total: quote.total || (Number(quote.quantity || 1) * Number(quote.unitValue || 0) - Number(quote.discount || 0)),
+          },
+        ];
+    const subtotal = quoteItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitValue || 0), 0);
+    const discount = Number(quote.discount || quoteItems.reduce((sum, item) => sum + Number(item.discount || 0), 0));
+    const total = Number(quote.total || subtotal - discount);
+
+    function safeText(value) {
+      return String(value ?? "-");
+    }
+
+    function addFooter() {
+      doc.setDrawColor(...line);
+      doc.line(page.margin, page.height - 48, page.width - page.margin, page.height - 48);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...muted);
+      doc.text(`${COMPANY_INFO.legalName} · CNPJ ${COMPANY_INFO.cnpj}`, page.margin, page.height - 30);
+      doc.text("Documento gerado pelo Artes Lion Manager", page.width - page.margin, page.height - 30, { align: "right" });
+    }
+
+    function checkPage(space = 80) {
+      if (y + space <= page.height - 64) return;
+      addFooter();
+      doc.addPage();
+      y = 44;
+    }
+
+    function sectionTitle(title) {
+      checkPage(48);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(...graphite);
+      doc.text(title.toUpperCase(), page.margin, y);
+      doc.setDrawColor(...gold);
+      doc.setLineWidth(2);
+      doc.line(page.margin, y + 7, page.margin + 78, y + 7);
+      y += 24;
+    }
+
+    function keyValue(label, value, x, width) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(...muted);
+      doc.text(label.toUpperCase(), x, y);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...graphite);
+      const lines = doc.splitTextToSize(safeText(value), width);
+      doc.text(lines, x, y + 14);
+      return 18 + lines.length * 12;
+    }
+
+    doc.setFillColor(...graphite);
+    doc.rect(0, 0, page.width, 116, "F");
+    doc.setFillColor(...gold);
+    doc.roundedRect(page.margin, 30, 54, 54, 8, 8, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(...graphite);
+    doc.text("AL", page.margin + 27, 64, { align: "center" });
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.text("Proposta Comercial", page.margin + 72, 48);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(COMPANY_INFO.tradeName, page.margin + 72, 66);
+    doc.text(`${COMPANY_INFO.address} · ${COMPANY_INFO.city}`, page.margin + 72, 82);
+    doc.text(`CNPJ ${COMPANY_INFO.cnpj} · ${COMPANY_INFO.phone}`, page.margin + 72, 98);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...gold);
+    doc.text(safeText(quote.number), page.width - page.margin, 48, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Emissão: ${dateLabel(new Date().toISOString().slice(0, 10))}`, page.width - page.margin, 68, { align: "right" });
+    doc.text(`Validade: ${dateLabel(quote.validUntil)}`, page.width - page.margin, 84, { align: "right" });
+
+    y = 148;
+    sectionTitle("Dados do cliente");
+    const leftX = page.margin;
+    const rightX = page.width / 2 + 12;
+    let leftHeight = keyValue("Cliente", client?.name || "Cliente não informado", leftX, 232);
+    let rightHeight = keyValue("Telefone / WhatsApp", client?.phone || "-", rightX, 210);
+    y += Math.max(leftHeight, rightHeight);
+    leftHeight = keyValue("CPF / CNPJ", client?.document || "-", leftX, 232);
+    rightHeight = keyValue("E-mail", client?.email || "-", rightX, 210);
+    y += Math.max(leftHeight, rightHeight);
+    const addressHeight = keyValue("Endereço", client?.address || "-", leftX, page.width - page.margin * 2);
+    y += addressHeight + 4;
+
+    sectionTitle("Itens orçados");
+    const tableX = page.margin;
+    const tableW = page.width - page.margin * 2;
+    const cols = {
+      item: tableX + 12,
+      service: tableX + 244,
+      qty: tableX + 340,
+      unit: tableX + 386,
+      total: tableX + 470,
+    };
+
+    function tableHeader() {
+      doc.setFillColor(248, 249, 250);
+      doc.setDrawColor(...line);
+      doc.rect(tableX, y, tableW, 28, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(...muted);
+      doc.text("ITEM", cols.item, y + 18);
+      doc.text("SERVIÇO", cols.service, y + 18);
+      doc.text("QTD", cols.qty, y + 18);
+      doc.text("UNITÁRIO", cols.unit, y + 18);
+      doc.text("TOTAL", cols.total, y + 18);
+      y += 28;
+    }
+
+    tableHeader();
+    quoteItems.forEach((item, index) => {
+      const description = `${index + 1}. ${safeText(item.description || item.product || quote.product)}`;
+      const itemLines = doc.splitTextToSize(description, 216);
+      const serviceLines = doc.splitTextToSize(safeText(item.service || quote.service), 82);
+      const rowHeight = Math.max(36, 14 + Math.max(itemLines.length, serviceLines.length) * 12);
+      checkPage(rowHeight + 28);
+      if (y < 80) tableHeader();
+      doc.setDrawColor(...line);
+      doc.rect(tableX, y, tableW, rowHeight);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...graphite);
+      doc.text(itemLines, cols.item, y + 16);
+      doc.text(serviceLines, cols.service, y + 16);
+      doc.text(safeText(item.quantity || 0), cols.qty, y + 16);
+      doc.text(BRL.format(Number(item.unitValue || 0)), cols.unit, y + 16);
+      doc.text(BRL.format(Number(item.total || Number(item.quantity || 0) * Number(item.unitValue || 0))), cols.total, y + 16);
+      y += rowHeight;
+    });
+
+    y += 20;
+    checkPage(130);
+    doc.setFillColor(255, 249, 219);
+    doc.setDrawColor(255, 236, 153);
+    doc.roundedRect(page.width - 238, y, 198, 96, 8, 8, "FD");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...muted);
+    doc.text("Subtotal", page.width - 218, y + 24);
+    doc.text(BRL.format(subtotal), page.width - 58, y + 24, { align: "right" });
+    doc.text("Desconto", page.width - 218, y + 45);
+    doc.text(BRL.format(discount), page.width - 58, y + 45, { align: "right" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...graphite);
+    doc.text("Total", page.width - 218, y + 73);
+    doc.text(BRL.format(total), page.width - 58, y + 73, { align: "right" });
+    y += 122;
+
+    sectionTitle("Condições comerciais");
+    leftHeight = keyValue("Prazo solicitado", dateLabel(quote.requestedDueDate), leftX, 232);
+    rightHeight = keyValue("Forma de pagamento", quote.payment || "-", rightX, 210);
+    y += Math.max(leftHeight, rightHeight);
+    leftHeight = keyValue("Status do orçamento", quote.status || "-", leftX, 232);
+    rightHeight = keyValue("Validade da proposta", dateLabel(quote.validUntil), rightX, 210);
+    y += Math.max(leftHeight, rightHeight) + 4;
+
+    if (quote.notes) {
+      sectionTitle("Observações");
+      const notes = doc.splitTextToSize(quote.notes, page.width - page.margin * 2);
+      checkPage(notes.length * 12 + 24);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...graphite);
+      doc.text(notes, page.margin, y);
+      y += notes.length * 12 + 12;
+    }
+
+    if (quote.attachments?.length) {
+      sectionTitle("Referências e anexos");
+      const attachmentText = quote.attachments.join(", ");
+      const attachmentLines = doc.splitTextToSize(attachmentText, page.width - page.margin * 2);
+      checkPage(attachmentLines.length * 12 + 20);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(...graphite);
+      doc.text(attachmentLines, page.margin, y);
+      y += attachmentLines.length * 12 + 10;
+    }
+
+    checkPage(70);
+    doc.setDrawColor(...line);
+    doc.line(page.margin, y + 22, page.margin + 190, y + 22);
+    doc.line(page.width - page.margin - 190, y + 22, page.width - page.margin, y + 22);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...muted);
+    doc.text("Artes Lion Estamparia", page.margin + 95, y + 38, { align: "center" });
+    doc.text("Cliente / responsável", page.width - page.margin - 95, y + 38, { align: "center" });
+
+    addFooter();
+    doc.save(`orcamento-${quote.number}.pdf`);
+    showToast(`Orçamento ${quote.number} gerado em PDF profissional.`);
   }
 
   function saveClient(client) {
@@ -3259,8 +3964,45 @@ function App() {
   }
 
   function saveOrder(order) {
-    setOrders((items) => [order, ...items]);
-    setSelectedOrderId(order.id);
+    let finalOrder = order;
+    const stockQty = Number(order.stockQty || 0);
+    if (stockQty > 0 && !order.stockItemId) {
+      window.alert("Selecione o material do estoque para fazer a baixa automatica.");
+      return;
+    }
+    if (order.stockItemId && stockQty <= 0) {
+      window.alert("Informe uma quantidade maior que zero para baixar do estoque.");
+      return;
+    }
+    if (order.stockItemId) {
+      const stockItem = stock.find((item) => item.id === Number(order.stockItemId));
+      if (!stockItem) {
+        window.alert("Material de estoque não encontrado. Atualize o pedido e tente novamente.");
+        return;
+      }
+      if (stockQty > Number(stockItem.qty || 0)) {
+        window.alert(`Estoque insuficiente para ${stockItem.item}. Disponível: ${stockItem.qty} ${stockItem.unit}.`);
+        return;
+      }
+    }
+    if (order.stockItemId && stockQty > 0) {
+      finalOrder = {
+        ...order,
+        history: [
+          { at: dateTimeNowLabel(), text: `Baixa automática no estoque: ${stockQty} de ${order.stockItemName}.` },
+          ...(order.history || []),
+        ],
+      };
+      setStock((items) =>
+        items.map((item) =>
+          item.id === Number(order.stockItemId)
+            ? { ...item, qty: Math.max(0, Number(item.qty || 0) - stockQty) }
+            : item
+        )
+      );
+    }
+    setOrders((items) => [finalOrder, ...items]);
+    setSelectedOrderId(finalOrder.id);
     if (order.deposit > 0) {
       setTransactions((items) => [
         {
@@ -3277,7 +4019,7 @@ function App() {
       ]);
     }
     closeModal();
-    showToast(`Pedido ${order.number} criado.`);
+    showToast(order.stockItemId ? `Pedido ${order.number} criado e estoque baixado.` : `Pedido ${order.number} criado.`);
   }
 
   function saveQuote(quote) {
@@ -3387,6 +4129,14 @@ function App() {
     showToast("Pedido atualizado para pronto e WhatsApp aberto.");
   }
 
+  const periodRange = getPeriodRange(periodMode, customStart, customEnd);
+  const periodOrders = orders.filter((order) => isWithinPeriod(order.createdAt || order.dueDate, periodRange));
+  const periodQuotes = quotes.filter((quote) => isWithinPeriod(quote.createdAt || quote.requestedDueDate || quote.validUntil, periodRange));
+  const periodTransactions = transactions.filter((transaction) => isWithinPeriod(transaction.date, periodRange));
+  const periodReminders = reminders.filter((reminder) => isWithinPeriod(reminder.date, periodRange));
+  const periodEmployeeAbsences = employeeAbsences.filter((absence) => isWithinPeriod(absence.date, periodRange));
+  const periodEmployeeAdvances = employeeAdvances.filter((advance) => isWithinPeriod(advance.date, periodRange));
+
   const activeLabel = MENU.find((item) => item.id === activeModule)?.label || "Dashboard";
 
   if (!isAuthenticated) {
@@ -3439,6 +4189,27 @@ function App() {
             </div>
           </div>
           <div className="topbar-user">
+            <div className="period-filter">
+              <label>
+                Período
+                <select value={periodMode} onChange={(event) => setPeriodMode(event.target.value)}>
+                  <option value="geral">Geral</option>
+                  <option value="semana">Semana</option>
+                  <option value="quinzena">Quinzena</option>
+                  <option value="mes">Mês</option>
+                  <option value="trimestre">Trimestre</option>
+                  <option value="semestre">Semestre</option>
+                  <option value="anual">Anual</option>
+                  <option value="personalizado">Personalizado</option>
+                </select>
+              </label>
+              {periodMode === "personalizado" ? (
+                <>
+                  <input type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} />
+                  <input type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} />
+                </>
+              ) : null}
+            </div>
             <span>{user?.role}</span>
             <div className="user-dot">{user?.email?.slice(0, 1).toUpperCase()}</div>
           </div>
@@ -3448,11 +4219,11 @@ function App() {
           {activeModule === "dashboard" && (
             <DashboardView
               clients={clients}
-              orders={orders}
-              quotes={quotes}
+              orders={periodOrders}
+              quotes={periodQuotes}
               artworks={artworks}
               stock={stock}
-              transactions={transactions}
+              transactions={periodTransactions}
               openModal={openModal}
               exportDashboardPDF={exportDashboardPDF}
               exportExcel={exportExcel}
@@ -3464,8 +4235,8 @@ function App() {
           {activeModule === "clientes" && (
             <ClientsView
               clients={clients}
-              orders={orders}
-              quotes={quotes}
+              orders={periodOrders}
+              quotes={periodQuotes}
               artworks={artworks}
               selectedClientId={selectedClientId}
               setSelectedClientId={setSelectedClientId}
@@ -3478,7 +4249,7 @@ function App() {
           )}
           {activeModule === "orcamentos" && (
             <QuotesView
-              quotes={quotes}
+              quotes={periodQuotes}
               clients={clients}
               setQuotes={setQuotes}
               createOrderFromQuote={createOrderFromQuote}
@@ -3491,7 +4262,7 @@ function App() {
           )}
           {activeModule === "pedidos" && (
             <OrdersView
-              orders={orders}
+              orders={periodOrders}
               clients={clients}
               setOrders={setOrders}
               openModal={openModal}
@@ -3506,19 +4277,31 @@ function App() {
               setSelectedOrderId={setSelectedOrderId}
             />
           )}
-          {activeModule === "producao" && <ProductionView orders={orders} clients={clients} setOrders={setOrders} />}
+          {activeModule === "producao" && <ProductionView orders={periodOrders} clients={clients} setOrders={setOrders} />}
           {activeModule === "estoque" && <StockView stock={stock} setStock={setStock} exportExcel={exportExcel} exportPDF={exportPDF} showToast={showToast} />}
           {activeModule === "financeiro" && (
-            <FinanceView transactions={transactions} orders={orders} clients={clients} exportExcel={exportExcel} exportPDF={exportPDF} registerPayment={registerPayment} />
+            <FinanceView transactions={periodTransactions} orders={periodOrders} clients={clients} exportExcel={exportExcel} exportPDF={exportPDF} registerPayment={registerPayment} />
           )}
-          {activeModule === "fluxo" && <CashFlowView transactions={transactions} orders={orders} />}
-          {activeModule === "produtos" && <ProductsView orders={orders} />}
+          {activeModule === "fluxo" && <CashFlowView transactions={periodTransactions} orders={periodOrders} setTransactions={setTransactions} showToast={showToast} />}
+          {activeModule === "produtos" && <ProductsView orders={periodOrders} />}
           {activeModule === "fornecedores" && (
             <SuppliersView suppliers={suppliers} setSuppliers={setSuppliers} stock={stock} setStock={setStock} transactions={transactions} setTransactions={setTransactions} moveToTrash={moveToTrash} showToast={showToast} />
           )}
-          {activeModule === "relatorios" && <ReportsView clients={clients} orders={orders} stock={stock} transactions={transactions} exportPDF={exportPDF} />}
+          {activeModule === "funcionarios" && (
+            <EmployeesView
+              employees={employees}
+              setEmployees={setEmployees}
+              absences={employeeAbsences}
+              setAbsences={setEmployeeAbsences}
+              advances={employeeAdvances}
+              setAdvances={setEmployeeAdvances}
+              periodRange={periodRange}
+              showToast={showToast}
+            />
+          )}
+          {activeModule === "relatorios" && <ReportsView clients={clients} orders={periodOrders} stock={stock} transactions={periodTransactions} exportPDF={exportPDF} />}
           {activeModule === "exportacoes" && (
-            <ExportsView clients={clients} quotes={quotes} orders={orders} stock={stock} transactions={transactions} reminders={reminders} exportExcel={exportExcel} exportPDF={exportPDF} exportDashboardPDF={exportDashboardPDF} />
+            <ExportsView clients={clients} quotes={periodQuotes} orders={periodOrders} stock={stock} transactions={periodTransactions} reminders={periodReminders} employees={employees} employeeAbsences={periodEmployeeAbsences} employeeAdvances={periodEmployeeAdvances} exportExcel={exportExcel} exportPDF={exportPDF} exportDashboardPDF={exportDashboardPDF} />
           )}
           {activeModule === "lixeira" && (
             <TrashView trashItems={trashItems} restoreTrashItem={restoreTrashItem} deleteTrashItem={deleteTrashItem} />
@@ -3536,7 +4319,7 @@ function App() {
       )}
       {modal?.type === "order" && (
         <Modal title="Criar pedido" onClose={closeModal}>
-          <OrderForm clients={clients} onSave={saveOrder} onCancel={closeModal} initialQuote={modal.payload?.quote} />
+          <OrderForm clients={clients} stock={stock} onSave={saveOrder} onCancel={closeModal} initialQuote={modal.payload?.quote} />
         </Modal>
       )}
       {modal?.type === "quote" && (
