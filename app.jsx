@@ -34,6 +34,7 @@ const COMPANY_INFO = {
   zip: "28083-650",
   phone: "(22) 8175-2570",
 };
+const BRAND_LOGO = "./assets/logo-artes-lion-cropped.png";
 
 const PRODUCTION_STATUSES = [
   "Pedido criado",
@@ -962,7 +963,7 @@ function Login({ onLogin, users }) {
   return (
     <main className="login-screen">
       <section className="login-panel">
-        <div className="brand-mark large">AL</div>
+        <img className="brand-logo login-logo" src={BRAND_LOGO} alt="Artes Lion Estamparia" />
         <div>
           <p className="eyebrow">Artes Lion Estamparia</p>
           <h1>Artes Lion Manager</h1>
@@ -1064,7 +1065,7 @@ function DashboardView({ clients, orders, quotes, artworks, stock, transactions,
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
-  const chartColors = ["#d7a900", "#2f9e44", "#1c7ed6", "#f76707", "#ae3ec9", "#e03131", "#495057"];
+  const chartColors = ["#00ff2a", "#111111", "#2f9e44", "#1c7ed6", "#f76707", "#ae3ec9", "#495057"];
 
   const alerts = [
     ...overdueOrders.map((order) => ({ tone: "danger", text: `${order.number} atrasado para ${dateLabel(order.dueDate)}` })),
@@ -1120,8 +1121,8 @@ function DashboardView({ clients, orders, quotes, artworks, stock, transactions,
                 {
                   label: "Faturamento",
                   data: revenueByMonth.map((item) => item.value),
-                  borderColor: "#d7a900",
-                  backgroundColor: "rgba(215,169,0,0.15)",
+                  borderColor: "#00ff2a",
+                  backgroundColor: "rgba(0,255,42,0.16)",
                   fill: true,
                   tension: 0.38,
                   pointRadius: 4,
@@ -1139,7 +1140,7 @@ function DashboardView({ clients, orders, quotes, artworks, stock, transactions,
             type="doughnut"
             data={{
               labels: ["Recebido", "Pendente"],
-              datasets: [{ data: [receivedMonth, pendingValue], backgroundColor: ["#2f9e44", "#d7a900"], borderWidth: 0 }],
+              datasets: [{ data: [receivedMonth, pendingValue], backgroundColor: ["#2f9e44", "#00ff2a"], borderWidth: 0 }],
             }}
           />
         </article>
@@ -1179,7 +1180,7 @@ function DashboardView({ clients, orders, quotes, artworks, stock, transactions,
             type="bar"
             data={{
               labels: Object.keys(serviceProfit),
-              datasets: [{ label: "Lucro", data: Object.values(serviceProfit), backgroundColor: "#d7a900", borderRadius: 6 }],
+              datasets: [{ label: "Lucro", data: Object.values(serviceProfit), backgroundColor: "#00ff2a", borderRadius: 6 }],
             }}
             options={{ plugins: { legend: { display: false } } }}
           />
@@ -1606,6 +1607,24 @@ function QuotesView({ quotes, clients, setQuotes, createOrderFromQuote, openModa
           </>
         }
       />
+      <article className="panel stock-form-panel">
+        <div className="panel-title">
+          <h2>Cadastrar material</h2>
+          <span>Use nomes claros para vincular ao pedido</span>
+        </div>
+        <form className="form-grid" onSubmit={saveStockItem}>
+          <label>Nome do material<input value={form.item} onChange={(event) => update("item", event.target.value)} placeholder="Ex.: Camisa algodão branca P" required /></label>
+          <label>Categoria<input value={form.category} onChange={(event) => update("category", event.target.value)} placeholder="Camisas, Brindes, Insumos" /></label>
+          <label>Unidade<input value={form.unit} onChange={(event) => update("unit", event.target.value)} placeholder="un, m, kg, ml" /></label>
+          <label>Quantidade atual<input type="number" value={form.qty} onChange={(event) => update("qty", event.target.value)} min="0" step="0.01" /></label>
+          <label>Estoque mínimo<input type="number" value={form.min} onChange={(event) => update("min", event.target.value)} min="0" step="0.01" /></label>
+          <label>Custo médio<input value={form.avgCost} onChange={(event) => update("avgCost", event.target.value)} /></label>
+          <label className="span-2">Fornecedor<input value={form.supplier} onChange={(event) => update("supplier", event.target.value)} /></label>
+          <div className="form-actions span-2">
+            <Button icon="save">Cadastrar material</Button>
+          </div>
+        </form>
+      </article>
       <article className="panel">
         <div className="table-scroll">
           <table>
@@ -2075,24 +2094,6 @@ function StockView({ stock, setStock, exportExcel, exportPDF, showToast }) {
           </>
         }
       />
-      <article className="panel stock-form-panel">
-        <div className="panel-title">
-          <h2>Cadastrar material</h2>
-          <span>Use nomes claros para vincular ao pedido</span>
-        </div>
-        <form className="form-grid" onSubmit={saveStockItem}>
-          <label>Nome do material<input value={form.item} onChange={(event) => update("item", event.target.value)} placeholder="Ex.: Camisa algodão branca P" required /></label>
-          <label>Categoria<input value={form.category} onChange={(event) => update("category", event.target.value)} placeholder="Camisas, Brindes, Insumos" /></label>
-          <label>Unidade<input value={form.unit} onChange={(event) => update("unit", event.target.value)} placeholder="un, m, kg, ml" /></label>
-          <label>Quantidade atual<input type="number" value={form.qty} onChange={(event) => update("qty", event.target.value)} min="0" step="0.01" /></label>
-          <label>Estoque mínimo<input type="number" value={form.min} onChange={(event) => update("min", event.target.value)} min="0" step="0.01" /></label>
-          <label>Custo médio<input value={form.avgCost} onChange={(event) => update("avgCost", event.target.value)} /></label>
-          <label className="span-2">Fornecedor<input value={form.supplier} onChange={(event) => update("supplier", event.target.value)} /></label>
-          <div className="form-actions span-2">
-            <Button icon="save">Cadastrar material</Button>
-          </div>
-        </form>
-      </article>
       <article className="panel">
         <div className="table-scroll">
           <table>
@@ -2319,7 +2320,7 @@ function CashFlowView({ transactions, orders, setTransactions, showToast }) {
             type="bar"
             data={{
               labels: byDay.map((item) => item.date),
-              datasets: [{ label: "Resultado do dia", data: byDay.map((item) => item.amount), backgroundColor: "#d7a900", borderRadius: 6 }],
+              datasets: [{ label: "Resultado do dia", data: byDay.map((item) => item.amount), backgroundColor: "#00ff2a", borderRadius: 6 }],
             }}
           />
         </article>
@@ -3606,7 +3607,7 @@ function App() {
     let y = 52;
     doc.setFillColor(23, 23, 23);
     doc.rect(0, 0, pageWidth, 84, "F");
-    doc.setTextColor(215, 169, 0);
+    doc.setTextColor(0, 255, 42);
     doc.setFontSize(18);
     doc.text("Artes Lion Estamparia", 40, 38);
     doc.setTextColor(255, 255, 255);
@@ -3736,7 +3737,7 @@ function App() {
     const client = clientForId(quote.clientId);
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" });
     const page = { width: doc.internal.pageSize.getWidth(), height: doc.internal.pageSize.getHeight(), margin: 40 };
-    const gold = [215, 169, 0];
+    const gold = [0, 255, 42];
     const graphite = [23, 23, 23];
     const muted = [98, 105, 116];
     const line = [221, 225, 231];
@@ -4155,10 +4156,10 @@ function App() {
     <div className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="brand-mark">AL</div>
+          <img className="brand-logo sidebar-logo" src={BRAND_LOGO} alt="Artes Lion Estamparia" />
           <div>
             <strong>Artes Lion</strong>
-            <span>Manager</span>
+            <span>Estamparia Manager</span>
           </div>
           <IconButton label="Fechar menu" icon="x" className="mobile-only" onClick={() => setSidebarOpen(false)} />
         </div>
