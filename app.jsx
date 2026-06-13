@@ -34,7 +34,7 @@ const COMPANY_INFO = {
   zip: "28083-650",
   phone: "(22) 8175-2570",
 };
-const BRAND_LOGO = "./assets/logo-artes-lion-cropped.png";
+const BRAND_LOGO = "/assets/logo-artes-lion-cropped.png?v=20260613";
 
 const PRODUCTION_STATUSES = [
   "Pedido criado",
@@ -882,49 +882,103 @@ function EmptyState({ title, text }) {
   );
 }
 
+class ModuleErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Erro ao abrir módulo", error, info);
+  }
+
+  componentDidUpdate(previousProps) {
+    if (previousProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <article className="panel module-error">
+        <div className="metric-icon">
+          <Icon name="triangle-alert" />
+        </div>
+        <div>
+          <h2>Não foi possível abrir esta aba</h2>
+          <p>O sistema evitou a tela branca. Clique em outra aba ou tente abrir esta novamente.</p>
+          <Button variant="secondary" icon="refresh-cw" onClick={() => this.setState({ error: null })}>
+            Tentar novamente
+          </Button>
+        </div>
+      </article>
+    );
+  }
+}
+
 function ChartCanvas({ type, data, options = {} }) {
   const canvasRef = useRef(null);
+  const [chartError, setChartError] = useState("");
 
   useEffect(() => {
-    if (!window.Chart || !canvasRef.current) return undefined;
-    const chart = new window.Chart(canvasRef.current, {
-      type,
-      data,
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { intersect: false, mode: "index" },
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: {
-              color: "#5c616b",
-              boxWidth: 10,
-              usePointStyle: true,
-              font: { size: 11 },
+    if (!canvasRef.current) return undefined;
+    if (!window.Chart) {
+      setChartError("Biblioteca de gráficos não carregada.");
+      return undefined;
+    }
+    let chart;
+    try {
+      setChartError("");
+      chart = new window.Chart(canvasRef.current, {
+        type,
+        data,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: "index" },
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: {
+                color: "#5c616b",
+                boxWidth: 10,
+                usePointStyle: true,
+                font: { size: 11 },
+              },
+            },
+            tooltip: {
+              backgroundColor: "#050505",
+              borderColor: "#00ff2a",
+              borderWidth: 1,
             },
           },
-          tooltip: {
-            backgroundColor: "#171717",
-            borderColor: "#d8a90d",
-            borderWidth: 1,
-          },
+          scales:
+            type === "doughnut" || type === "pie"
+              ? {}
+              : {
+                  x: { grid: { display: false }, ticks: { color: "#62666f" } },
+                  y: { grid: { color: "rgba(23,23,23,0.08)" }, ticks: { color: "#62666f" } },
+                },
+          ...options,
         },
-        scales:
-          type === "doughnut" || type === "pie"
-            ? {}
-            : {
-                x: { grid: { display: false }, ticks: { color: "#62666f" } },
-                y: { grid: { color: "rgba(23,23,23,0.08)" }, ticks: { color: "#62666f" } },
-              },
-        ...options,
-      },
-    });
-    return () => chart.destroy();
+      });
+    } catch (error) {
+      console.error("Erro ao renderizar gráfico", error);
+      setChartError("Não foi possível carregar este gráfico.");
+    }
+    return () => {
+      if (chart) chart.destroy();
+    };
   }, [type, JSON.stringify(data), JSON.stringify(options)]);
 
   return (
     <div className="chart-height">
+      {chartError ? <div className="chart-fallback">{chartError}</div> : null}
       <canvas ref={canvasRef} />
     </div>
   );
@@ -4217,99 +4271,101 @@ function App() {
         </header>
 
         <div className="content-area">
-          {activeModule === "dashboard" && (
-            <DashboardView
-              clients={clients}
-              orders={periodOrders}
-              quotes={periodQuotes}
-              artworks={artworks}
-              stock={stock}
-              transactions={periodTransactions}
-              openModal={openModal}
-              exportDashboardPDF={exportDashboardPDF}
-              exportExcel={exportExcel}
-            />
-          )}
-          {activeModule === "lembretes" && (
-            <RemindersView reminders={reminders} setReminders={setReminders} moveToTrash={moveToTrash} showToast={showToast} />
-          )}
-          {activeModule === "clientes" && (
-            <ClientsView
-              clients={clients}
-              orders={periodOrders}
-              quotes={periodQuotes}
-              artworks={artworks}
-              selectedClientId={selectedClientId}
-              setSelectedClientId={setSelectedClientId}
-              openModal={openModal}
-              exportExcel={exportExcel}
-              exportPDF={exportPDF}
-              openWhatsAppTemplate={openWhatsAppTemplate}
-              moveToTrash={moveToTrash}
-            />
-          )}
-          {activeModule === "orcamentos" && (
-            <QuotesView
-              quotes={periodQuotes}
-              clients={clients}
-              setQuotes={setQuotes}
-              createOrderFromQuote={createOrderFromQuote}
-              openModal={openModal}
-              exportExcel={exportExcel}
-              exportQuotePDF={exportQuotePDF}
-              moveToTrash={moveToTrash}
-              showToast={showToast}
-            />
-          )}
-          {activeModule === "pedidos" && (
-            <OrdersView
-              orders={periodOrders}
-              clients={clients}
-              setOrders={setOrders}
-              openModal={openModal}
-              exportExcel={exportExcel}
-              exportPDF={exportPDF}
-              exportOrderPDF={exportOrderPDF}
-              exportFiscalCoupon={exportFiscalCoupon}
-              handleOrderReady={handleOrderReady}
-              registerPayment={registerPayment}
-              moveToTrash={moveToTrash}
-              selectedOrderId={selectedOrderId}
-              setSelectedOrderId={setSelectedOrderId}
-            />
-          )}
-          {activeModule === "producao" && <ProductionView orders={periodOrders} clients={clients} setOrders={setOrders} />}
-          {activeModule === "estoque" && <StockView stock={stock} setStock={setStock} exportExcel={exportExcel} exportPDF={exportPDF} showToast={showToast} />}
-          {activeModule === "financeiro" && (
-            <FinanceView transactions={periodTransactions} orders={periodOrders} clients={clients} exportExcel={exportExcel} exportPDF={exportPDF} registerPayment={registerPayment} />
-          )}
-          {activeModule === "fluxo" && <CashFlowView transactions={periodTransactions} orders={periodOrders} setTransactions={setTransactions} showToast={showToast} />}
-          {activeModule === "produtos" && <ProductsView orders={periodOrders} />}
-          {activeModule === "fornecedores" && (
-            <SuppliersView suppliers={suppliers} setSuppliers={setSuppliers} stock={stock} setStock={setStock} transactions={transactions} setTransactions={setTransactions} moveToTrash={moveToTrash} showToast={showToast} />
-          )}
-          {activeModule === "funcionarios" && (
-            <EmployeesView
-              employees={employees}
-              setEmployees={setEmployees}
-              absences={employeeAbsences}
-              setAbsences={setEmployeeAbsences}
-              advances={employeeAdvances}
-              setAdvances={setEmployeeAdvances}
-              periodRange={periodRange}
-              showToast={showToast}
-            />
-          )}
-          {activeModule === "relatorios" && <ReportsView clients={clients} orders={periodOrders} stock={stock} transactions={periodTransactions} exportPDF={exportPDF} />}
-          {activeModule === "exportacoes" && (
-            <ExportsView clients={clients} quotes={periodQuotes} orders={periodOrders} stock={stock} transactions={periodTransactions} reminders={periodReminders} employees={employees} employeeAbsences={periodEmployeeAbsences} employeeAdvances={periodEmployeeAdvances} exportExcel={exportExcel} exportPDF={exportPDF} exportDashboardPDF={exportDashboardPDF} />
-          )}
-          {activeModule === "lixeira" && (
-            <TrashView trashItems={trashItems} restoreTrashItem={restoreTrashItem} deleteTrashItem={deleteTrashItem} />
-          )}
-          {activeModule === "configuracoes" && (
-            <SettingsView users={users} currentUser={user} deleteUser={deleteUser} recreateTestUser={recreateTestUser} />
-          )}
+          <ModuleErrorBoundary resetKey={activeModule}>
+            {activeModule === "dashboard" && (
+              <DashboardView
+                clients={clients}
+                orders={periodOrders}
+                quotes={periodQuotes}
+                artworks={artworks}
+                stock={stock}
+                transactions={periodTransactions}
+                openModal={openModal}
+                exportDashboardPDF={exportDashboardPDF}
+                exportExcel={exportExcel}
+              />
+            )}
+            {activeModule === "lembretes" && (
+              <RemindersView reminders={reminders} setReminders={setReminders} moveToTrash={moveToTrash} showToast={showToast} />
+            )}
+            {activeModule === "clientes" && (
+              <ClientsView
+                clients={clients}
+                orders={periodOrders}
+                quotes={periodQuotes}
+                artworks={artworks}
+                selectedClientId={selectedClientId}
+                setSelectedClientId={setSelectedClientId}
+                openModal={openModal}
+                exportExcel={exportExcel}
+                exportPDF={exportPDF}
+                openWhatsAppTemplate={openWhatsAppTemplate}
+                moveToTrash={moveToTrash}
+              />
+            )}
+            {activeModule === "orcamentos" && (
+              <QuotesView
+                quotes={periodQuotes}
+                clients={clients}
+                setQuotes={setQuotes}
+                createOrderFromQuote={createOrderFromQuote}
+                openModal={openModal}
+                exportExcel={exportExcel}
+                exportQuotePDF={exportQuotePDF}
+                moveToTrash={moveToTrash}
+                showToast={showToast}
+              />
+            )}
+            {activeModule === "pedidos" && (
+              <OrdersView
+                orders={periodOrders}
+                clients={clients}
+                setOrders={setOrders}
+                openModal={openModal}
+                exportExcel={exportExcel}
+                exportPDF={exportPDF}
+                exportOrderPDF={exportOrderPDF}
+                exportFiscalCoupon={exportFiscalCoupon}
+                handleOrderReady={handleOrderReady}
+                registerPayment={registerPayment}
+                moveToTrash={moveToTrash}
+                selectedOrderId={selectedOrderId}
+                setSelectedOrderId={setSelectedOrderId}
+              />
+            )}
+            {activeModule === "producao" && <ProductionView orders={periodOrders} clients={clients} setOrders={setOrders} />}
+            {activeModule === "estoque" && <StockView stock={stock} setStock={setStock} exportExcel={exportExcel} exportPDF={exportPDF} showToast={showToast} />}
+            {activeModule === "financeiro" && (
+              <FinanceView transactions={periodTransactions} orders={periodOrders} clients={clients} exportExcel={exportExcel} exportPDF={exportPDF} registerPayment={registerPayment} />
+            )}
+            {activeModule === "fluxo" && <CashFlowView transactions={periodTransactions} orders={periodOrders} setTransactions={setTransactions} showToast={showToast} />}
+            {activeModule === "produtos" && <ProductsView orders={periodOrders} />}
+            {activeModule === "fornecedores" && (
+              <SuppliersView suppliers={suppliers} setSuppliers={setSuppliers} stock={stock} setStock={setStock} transactions={transactions} setTransactions={setTransactions} moveToTrash={moveToTrash} showToast={showToast} />
+            )}
+            {activeModule === "funcionarios" && (
+              <EmployeesView
+                employees={employees}
+                setEmployees={setEmployees}
+                absences={employeeAbsences}
+                setAbsences={setEmployeeAbsences}
+                advances={employeeAdvances}
+                setAdvances={setEmployeeAdvances}
+                periodRange={periodRange}
+                showToast={showToast}
+              />
+            )}
+            {activeModule === "relatorios" && <ReportsView clients={clients} orders={periodOrders} stock={stock} transactions={periodTransactions} exportPDF={exportPDF} />}
+            {activeModule === "exportacoes" && (
+              <ExportsView clients={clients} quotes={periodQuotes} orders={periodOrders} stock={stock} transactions={periodTransactions} reminders={periodReminders} employees={employees} employeeAbsences={periodEmployeeAbsences} employeeAdvances={periodEmployeeAdvances} exportExcel={exportExcel} exportPDF={exportPDF} exportDashboardPDF={exportDashboardPDF} />
+            )}
+            {activeModule === "lixeira" && (
+              <TrashView trashItems={trashItems} restoreTrashItem={restoreTrashItem} deleteTrashItem={deleteTrashItem} />
+            )}
+            {activeModule === "configuracoes" && (
+              <SettingsView users={users} currentUser={user} deleteUser={deleteUser} recreateTestUser={recreateTestUser} />
+            )}
+          </ModuleErrorBoundary>
         </div>
       </main>
 

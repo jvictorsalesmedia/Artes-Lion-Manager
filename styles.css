@@ -159,8 +159,8 @@ textarea:focus {
 
 .sidebar-logo {
   flex: 0 0 auto;
-  width: 68px;
-  height: 62px;
+  width: 58px;
+  height: 52px;
   padding: 0.22rem;
   border: 1px solid rgba(0, 255, 42, 0.34);
   border-radius: 8px;
@@ -168,8 +168,8 @@ textarea:focus {
 
 .login-logo {
   justify-self: center;
-  width: min(310px, 100%);
-  max-height: 285px;
+  width: min(245px, 100%);
+  max-height: 225px;
   padding: 0.55rem;
   border: 1px solid rgba(0, 255, 42, 0.32);
   border-radius: 8px;
@@ -523,8 +523,39 @@ textarea:focus {
 }
 
 .chart-height {
+  position: relative;
   height: 295px;
   min-height: 240px;
+}
+
+.chart-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.module-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  border-color: rgba(0, 255, 42, 0.32);
+}
+
+.module-error h2 {
+  margin: 0 0 0.35rem;
+}
+
+.module-error p {
+  margin: 0 0 0.85rem;
+  color: var(--muted);
 }
 
 .ranking-list,
