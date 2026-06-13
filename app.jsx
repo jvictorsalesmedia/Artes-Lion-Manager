@@ -680,7 +680,7 @@ function normalizePhone(value) {
 }
 
 const STORAGE_VERSION_KEY = "alm_storage_version";
-const STORAGE_VERSION = "prod-reset-2026-06-10-001";
+const STORAGE_VERSION = "client-test-reset-2026-06-13-001";
 
 function ensureStorageVersion() {
   try {
@@ -1661,24 +1661,6 @@ function QuotesView({ quotes, clients, setQuotes, createOrderFromQuote, openModa
           </>
         }
       />
-      <article className="panel stock-form-panel">
-        <div className="panel-title">
-          <h2>Cadastrar material</h2>
-          <span>Use nomes claros para vincular ao pedido</span>
-        </div>
-        <form className="form-grid" onSubmit={saveStockItem}>
-          <label>Nome do material<input value={form.item} onChange={(event) => update("item", event.target.value)} placeholder="Ex.: Camisa algodão branca P" required /></label>
-          <label>Categoria<input value={form.category} onChange={(event) => update("category", event.target.value)} placeholder="Camisas, Brindes, Insumos" /></label>
-          <label>Unidade<input value={form.unit} onChange={(event) => update("unit", event.target.value)} placeholder="un, m, kg, ml" /></label>
-          <label>Quantidade atual<input type="number" value={form.qty} onChange={(event) => update("qty", event.target.value)} min="0" step="0.01" /></label>
-          <label>Estoque mínimo<input type="number" value={form.min} onChange={(event) => update("min", event.target.value)} min="0" step="0.01" /></label>
-          <label>Custo médio<input value={form.avgCost} onChange={(event) => update("avgCost", event.target.value)} /></label>
-          <label className="span-2">Fornecedor<input value={form.supplier} onChange={(event) => update("supplier", event.target.value)} /></label>
-          <div className="form-actions span-2">
-            <Button icon="save">Cadastrar material</Button>
-          </div>
-        </form>
-      </article>
       <article className="panel">
         <div className="table-scroll">
           <table>
