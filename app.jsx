@@ -911,9 +911,9 @@ class ModuleErrorBoundary extends React.Component {
         </div>
         <div>
           <h2>Não foi possível abrir esta aba</h2>
-          <p>O sistema evitou a tela branca. Clique em outra aba ou tente abrir esta novamente.</p>
-          <Button variant="secondary" icon="refresh-cw" onClick={() => this.setState({ error: null })}>
-            Tentar novamente
+          <p>O sistema evitou a tela branca. Recarregue o sistema para buscar a versão mais recente.</p>
+          <Button variant="secondary" icon="refresh-cw" onClick={() => window.location.reload()}>
+            Recarregar sistema
           </Button>
         </div>
       </article>
